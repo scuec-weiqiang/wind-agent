@@ -7,7 +7,7 @@ from typing import List
 
 import requests
 
-from chat import ChatSession, DEFAULT_MODEL, DEFAULT_URL
+from app.chat import ChatSession, DEFAULT_MODEL, DEFAULT_URL
 from skills.manager import SkillManager, SkillNotFound, SkillRegistryError
 
 COMMAND_PREFIX = ":"

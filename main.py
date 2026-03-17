@@ -1,41 +1,23 @@
-import requests
-import json
+from __future__ import annotations
 
-url = "http://localhost:11434/api/chat"
+import argparse
 
-messages = []
 
-while True:
-    user_input = input("You:")
-    messages.append({
-        "role":"user",
-        "content": user_input
-    })
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Wind Agent entrypoint")
+    parser.add_argument("mode", nargs="?", default="web", choices=["web", "cli"])
+    args = parser.parse_args()
 
-    data = {
-        "model": "qwen3.5:9b",
-        "messages": messages,
-        "stream": True,
-        "think":False
-    }
+    if args.mode == "cli":
+        from app.cli import main as cli_main
 
-    r = requests.post(url, json=data, stream=True)
+        cli_main()
+        return
 
-    print("AI: ", end="", flush=True)
+    from app.server import app
 
-    reply = ""
+    app.run(port=5000)
 
-    for line in r.iter_lines():
-        if line:
-            chunk = json.loads(line)
-            if "message" in chunk:
-                content = chunk["message"].get("content", "")
-                print(content, end="", flush=True)
-                reply += content
 
-    print()
-
-    messages.append({
-        "role": "assistant",
-        "content": reply
-    })
+if __name__ == "__main__":
+    main()
