@@ -10,6 +10,41 @@ DEFAULT_MODEL = "qwen3.5:9b"
 DEFAULT_URL = "http://localhost:11434/api/chat"
 DEFAULT_PROVIDER = "ollama"
 DEFAULT_OPENAI_COMPAT_URL = "https://api.openai.com/v1/chat/completions"
+DEFAULT_THINKING_MODE = "auto"
+
+
+def _extract_reasoning_text(payload: Dict[str, Any], provider: str) -> str:
+    if provider == "ollama":
+        message = payload.get("message", {}) or {}
+        if isinstance(message, dict):
+            return (
+                message.get("thinking")
+                or message.get("reasoning_content")
+                or payload.get("thinking")
+                or payload.get("reasoning_content")
+                or ""
+            )
+        return ""
+
+    if provider in {"openai", "openai_compatible", "openai-compatible"}:
+        choices = payload.get("choices") or []
+        if choices:
+            first = choices[0] or {}
+            delta = first.get("delta") or {}
+            message = first.get("message") or {}
+            return (
+                delta.get("reasoning_content")
+                or delta.get("reasoning")
+                or delta.get("thinking")
+                or message.get("reasoning_content")
+                or message.get("reasoning")
+                or message.get("thinking")
+                or payload.get("reasoning_content")
+                or payload.get("reasoning")
+                or payload.get("thinking")
+                or ""
+            )
+    return ""
 
 
 @dataclass
@@ -19,6 +54,7 @@ class ChatSession:
     provider: str = DEFAULT_PROVIDER
     api_key: str = ""
     think: bool = False
+    thinking_mode: str = DEFAULT_THINKING_MODE
     system_prompt: Optional[str] = None
     timeout: int = 120
     messages: List[Dict[str, str]] = field(default_factory=list)
@@ -36,19 +72,31 @@ class ChatSession:
 
     def _build_payload(self, stream: bool) -> Dict[str, Any]:
         provider = (self.provider or DEFAULT_PROVIDER).strip().lower()
+        thinking_mode = (self.thinking_mode or DEFAULT_THINKING_MODE).strip().lower()
         if provider == "ollama":
+            think_value = self.think
+            if thinking_mode == "on":
+                think_value = True
+            elif thinking_mode == "off":
+                think_value = False
             return {
                 "model": self.model,
                 "messages": self.messages,
                 "stream": stream,
-                "think": self.think,
+                "think": think_value,
             }
         if provider in {"openai", "openai_compatible", "openai-compatible"}:
-            return {
-                "model": self.model,
+            payload = {
+                "model": _resolve_model_name_for_thinking(self.model, thinking_mode),
                 "messages": self.messages,
                 "stream": stream,
             }
+            thinking_payload = _build_openai_compatible_thinking_payload(
+                payload["model"], thinking_mode
+            )
+            if thinking_payload is not None:
+                payload["thinking"] = thinking_payload
+            return payload
         raise ValueError(f"Unsupported model provider: {self.provider}")
 
     def _build_headers(self) -> Dict[str, str]:
@@ -72,11 +120,21 @@ class ChatSession:
             return data.get("output_text", "") or ""
         return ""
 
+    def _extract_reasoning_nonstream(self, data: Dict[str, Any]) -> str:
+        provider = (self.provider or DEFAULT_PROVIDER).strip().lower()
+        return _extract_reasoning_text(data, provider)
+
     def add_user_message(self, content: str) -> None:
         self.messages.append({"role": "user", "content": content})
 
     def add_assistant_message(self, content: str) -> None:
         self.messages.append({"role": "assistant", "content": content})
+
+    def add_assistant_message_with_reasoning(self, content: str, reasoning: str) -> None:
+        payload: Dict[str, str] = {"role": "assistant", "content": content}
+        if reasoning:
+            payload["thinking"] = reasoning
+        self.messages.append(payload)
 
     def ask(self, user_content: str) -> str:
         """Sends a user message and waits for the full completion."""
@@ -90,7 +148,8 @@ class ChatSession:
         response.raise_for_status()
         data = response.json()
         reply = self._extract_content_nonstream(data)
-        self.add_assistant_message(reply)
+        reasoning = self._extract_reasoning_nonstream(data)
+        self.add_assistant_message_with_reasoning(reply, reasoning)
         return reply
 
     def stream_chat(
@@ -107,6 +166,7 @@ class ChatSession:
         )
         response.raise_for_status()
         reply = ""
+        reasoning = ""
         provider = (self.provider or DEFAULT_PROVIDER).strip().lower()
 
         for line in response.iter_lines(decode_unicode=True):
@@ -119,6 +179,9 @@ class ChatSession:
                     continue
 
                 if "message" in payload:
+                    think_chunk = _extract_reasoning_text(payload, provider)
+                    if think_chunk:
+                        reasoning += think_chunk
                     chunk = payload["message"].get("content", "")
                     if chunk:
                         if on_chunk:
@@ -142,6 +205,9 @@ class ChatSession:
                 choices = payload.get("choices") or []
                 if not choices:
                     continue
+                think_chunk = _extract_reasoning_text(payload, provider)
+                if think_chunk:
+                    reasoning += think_chunk
                 delta = choices[0].get("delta") or {}
                 chunk = delta.get("content", "") or ""
                 if chunk:
@@ -150,7 +216,7 @@ class ChatSession:
                     reply += chunk
                 continue
 
-        self.add_assistant_message(reply)
+        self.add_assistant_message_with_reasoning(reply, reasoning)
         return reply
 
     def history(self) -> Iterable[Dict[str, str]]:
@@ -166,3 +232,36 @@ def ask(user_msg: str) -> str:
 
 def ask_stream(user_msg: str, on_chunk: Optional[StreamCallback] = None) -> str:
     return _default_session.stream_chat(user_msg, on_chunk=on_chunk)
+
+
+def normalize_thinking_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower()
+    if mode in {"on", "off", "auto"}:
+        return mode
+    return DEFAULT_THINKING_MODE
+
+
+def _resolve_model_name_for_thinking(model: str, thinking_mode: str) -> str:
+    normalized_model = (model or "").strip()
+    mode = normalize_thinking_mode(thinking_mode)
+    if mode == "auto":
+        return normalized_model
+    if normalized_model == "deepseek-chat" and mode == "on":
+        return "deepseek-reasoner"
+    if normalized_model == "deepseek-reasoner" and mode == "off":
+        return "deepseek-chat"
+    return normalized_model
+
+
+def _build_openai_compatible_thinking_payload(
+    model: str, thinking_mode: str
+) -> Dict[str, str] | None:
+    mode = normalize_thinking_mode(thinking_mode)
+    if mode == "auto":
+        return None
+
+    normalized_model = (model or "").strip().lower()
+    if normalized_model.startswith("deepseek-"):
+        return {"type": "enabled" if mode == "on" else "disabled"}
+
+    return None

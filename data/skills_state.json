@@ -1,0 +1,10 @@
+{
+  "enabled": {
+    "baidu-search": true,
+    "echo": false,
+    "email-mail-master 万能邮箱助手": true,
+    "shell": true,
+    "time": true,
+    "weather": true
+  }
+}

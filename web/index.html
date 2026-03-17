@@ -40,7 +40,7 @@ body {
     linear-gradient(180deg, rgba(250, 253, 255, 0.94), rgba(241, 248, 255, 0.86));
   backdrop-filter: blur(8px);
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto 1fr auto;
   min-height: 0;
 }
 .side-head { padding: 18px 14px 10px; }
@@ -70,6 +70,324 @@ body {
   overflow-y: auto;
   min-height: 0;
   padding: 2px 10px 14px;
+}
+.skills-panel {
+  border-top: 1px solid rgba(42, 82, 128, 0.14);
+  padding: 12px 10px 14px;
+  background: rgba(255, 255, 255, 0.34);
+}
+.trace-panel {
+  border-top: 1px solid rgba(42, 82, 128, 0.14);
+  padding: 12px 10px 14px;
+  background: rgba(255, 255, 255, 0.28);
+}
+.skills-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.skills-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #294766;
+}
+.skills-head button,
+.skill-actions button {
+  border: 1px solid rgba(45, 108, 223, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+  color: #21415e;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.skills-head button:hover,
+.skill-actions button:hover {
+  background: rgba(45, 108, 223, 0.08);
+}
+#skills-list {
+  display: grid;
+  gap: 8px;
+  max-height: 38vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.skill-card {
+  border: 1px solid rgba(52, 96, 146, 0.1);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.skill-card.disabled {
+  opacity: 0.68;
+  background: rgba(248, 250, 252, 0.85);
+}
+.skill-summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 11px;
+  cursor: pointer;
+}
+.skill-summary::-webkit-details-marker {
+  display: none;
+}
+.skill-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.skill-caret {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  position: relative;
+  border-radius: 999px;
+  background: rgba(45, 108, 223, 0.08);
+  transition: background 140ms ease, color 140ms ease;
+}
+.skill-caret::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid #31577c;
+  border-bottom: 2px solid #31577c;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+.skill-card[open] .skill-caret {
+  background: rgba(45, 108, 223, 0.16);
+  color: #1f4060;
+}
+.skill-card[open] .skill-caret::before {
+  transform: rotate(45deg);
+  border-color: #1f4060;
+}
+.skill-card-head {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.skill-summary-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.skill-summary:hover {
+  background: rgba(45, 108, 223, 0.05);
+}
+.skill-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1f4060;
+}
+.skill-dir {
+  font-size: 11px;
+  color: #7b8ea2;
+}
+.skill-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.skill-status.on {
+  background: rgba(15, 141, 115, 0.12);
+  color: #0f7c67;
+}
+.skill-status.off {
+  background: rgba(160, 87, 30, 0.12);
+  color: #8a5b21;
+}
+.skill-body {
+  padding: 0 11px 11px;
+  border-top: 1px solid rgba(52, 96, 146, 0.08);
+}
+.skill-desc,
+.skill-when,
+.skill-command {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #44617e;
+}
+.skill-meta {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #44617e;
+}
+.skill-tags {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(45, 108, 223, 0.08);
+  color: #2f567b;
+}
+.skill-tag.warn {
+  background: rgba(183, 97, 24, 0.12);
+  color: #8a5b21;
+}
+.skill-md {
+  margin-top: 8px;
+  border-radius: 12px;
+  background: rgba(22, 39, 57, 0.06);
+  border: 1px solid rgba(52, 96, 146, 0.12);
+  padding: 9px 10px;
+}
+.skill-md-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #36536f;
+  margin-bottom: 6px;
+}
+.skill-md-body {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #2f4d69;
+}
+.skill-md-body > * {
+  margin: 0 0 0.65em;
+}
+.skill-md-body > *:last-child {
+  margin-bottom: 0;
+}
+.skill-md-body h1,
+.skill-md-body h2,
+.skill-md-body h3,
+.skill-md-body h4 {
+  color: #1f4060;
+  line-height: 1.3;
+}
+.skill-md-body p,
+.skill-md-body li,
+.skill-md-body td,
+.skill-md-body th {
+  font-size: 12px;
+}
+.skill-md-body ul,
+.skill-md-body ol {
+  margin: 0.2em 0 0.75em 1.2em;
+  padding: 0;
+}
+.skill-md-body code {
+  font-size: 11px;
+  background: rgba(45, 108, 223, 0.08);
+  border-radius: 6px;
+  padding: 1px 5px;
+  word-break: break-word;
+}
+.skill-md-body pre {
+  margin: 0.35em 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: rgba(22, 39, 57, 0.08);
+  border: 1px solid rgba(52, 96, 146, 0.12);
+}
+.skill-md-body pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.skill-md-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.35em 0 0.7em;
+}
+.skill-md-body th,
+.skill-md-body td {
+  border: 1px solid rgba(52, 96, 146, 0.12);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.skill-md-body thead th {
+  background: rgba(45, 108, 223, 0.08);
+}
+.skill-command code {
+  word-break: break-all;
+}
+.skill-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.skill-empty {
+  font-size: 12px;
+  color: #6f86a0;
+  padding: 4px 2px;
+}
+.trace-box {
+  display: grid;
+  gap: 8px;
+  max-height: 28vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.trace-empty {
+  font-size: 12px;
+  color: #6f86a0;
+  padding: 4px 2px;
+}
+.trace-item {
+  border: 1px solid rgba(52, 96, 146, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  padding: 10px 11px;
+}
+.trace-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.trace-event {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1f4060;
+}
+.trace-time {
+  font-size: 11px;
+  color: #7b8ea2;
+  white-space: nowrap;
+}
+.trace-data {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #36536f;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.trace-data code {
+  font-size: 11px;
 }
 #session-list::-webkit-scrollbar {
   width: 8px;
@@ -172,9 +490,54 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 .top h1 { margin: 0; font-size: 16px; }
 .top small { color: var(--muted); }
+#top-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.composer-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgba(45, 108, 223, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(33, 83, 136, 0.08);
+}
+.thinking-btn {
+  border: none;
+  background: transparent;
+  color: #36536f;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+  white-space: nowrap;
+}
+.thinking-btn:hover {
+  background: rgba(45, 108, 223, 0.08);
+  color: #21415e;
+}
+.thinking-btn.active {
+  background: linear-gradient(145deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(36, 94, 162, 0.22);
+}
 #session-chip {
   font-size: 12px;
   color: #36536f;
@@ -278,7 +641,7 @@ body {
   width: min(860px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   border-radius: 22px;
@@ -391,6 +754,13 @@ body {
     border-radius: 18px;
     padding: 8px 8px 8px 12px;
   }
+  .composer-card, .welcome-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .composer-tools {
+    justify-content: space-between;
+  }
 }
 </style>
 </head>
@@ -405,6 +775,42 @@ body {
       <button id="new-session" onclick="createNewSession(true)">+ 新建会话</button>
     </div>
     <div id="session-list"></div>
+    <section class="skills-panel">
+      <div class="skills-head">
+        <span class="skills-title">Skill 面板</span>
+        <button id="reload-skills" type="button">Reload</button>
+      </div>
+      <div id="skills-list">
+        <div class="skill-empty">正在加载 skill...</div>
+      </div>
+    </section>
+    <section class="trace-panel">
+      <div class="skills-head">
+        <span class="skills-title">调用过程</span>
+        <button id="reload-trace" type="button">刷新</button>
+      </div>
+      <details id="trace-details">
+        <summary class="skill-summary">
+          <div class="skill-summary-left">
+            <div class="skill-card-head">
+              <div>
+                <div class="skill-name">Agent Trace</div>
+                <div class="skill-dir">查看当前会话的工具调用轨迹</div>
+              </div>
+            </div>
+          </div>
+          <div class="skill-summary-right">
+            <span id="trace-count" class="skill-status on">0 条</span>
+            <span class="skill-caret"></span>
+          </div>
+        </summary>
+        <div class="skill-body">
+          <div id="trace-list" class="trace-box">
+            <div class="trace-empty">请选择会话后查看调用轨迹。</div>
+          </div>
+        </div>
+      </details>
+    </section>
   </aside>
 
   <section class="main">
@@ -413,7 +819,9 @@ body {
         <h1>Web Console</h1>
         <small>你的智能风机助手</small>
       </div>
-      <span id="session-chip">Session: 未选择</span>
+      <div id="top-controls">
+        <span id="session-chip">Session: 未选择</span>
+      </div>
     </header>
 
     <main id="chat" class="hidden"></main>
@@ -424,6 +832,11 @@ body {
         <p class="welcome-sub">请先点击左侧会话，或直接在这里开始新对话。</p>
         <div class="welcome-row">
           <input id="welcome-msg" placeholder="比如：帮我总结一下这段内容" />
+          <div class="composer-tools">
+            <div class="thinking-toggle" aria-label="思考模式">
+              <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
+            </div>
+          </div>
           <button id="welcome-send" onclick="sendFromWelcome()">↑</button>
         </div>
       </div>
@@ -432,6 +845,11 @@ body {
     <section id="composer" class="hidden">
       <div class="composer-card">
         <input id="msg" placeholder="给 Wind Agent 发送消息..." />
+        <div class="composer-tools">
+          <div class="thinking-toggle" aria-label="思考模式">
+            <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
+          </div>
+        </div>
         <button id="send" onclick="send()">↑</button>
       </div>
     </section>
@@ -439,8 +857,14 @@ body {
 </div>
 
 <script>
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
 const STORAGE_KEY = "wind_sessions_v2";
 const SESSION_KEY = "wind_session_id";
+const THINKING_MODE_KEY = "wind_thinking_mode";
 
 const chat = document.getElementById("chat");
 const welcome = document.getElementById("welcome");
@@ -452,9 +876,48 @@ const welcomeSendBtn = document.getElementById("welcome-send");
 const newSessionBtn = document.getElementById("new-session");
 const sessionList = document.getElementById("session-list");
 const sessionChip = document.getElementById("session-chip");
+const thinkingModeButtons = Array.from(document.querySelectorAll("[data-role='thinking-cycle']"));
+const skillsList = document.getElementById("skills-list");
+const reloadSkillsBtn = document.getElementById("reload-skills");
+const traceList = document.getElementById("trace-list");
+const reloadTraceBtn = document.getElementById("reload-trace");
+const traceCount = document.getElementById("trace-count");
 
 let sessions = [];
 let currentSessionId = "";
+let thinkingMode = "auto";
+let skillsCache = [];
+let traceCache = [];
+
+function loadThinkingMode() {
+  const value = localStorage.getItem(THINKING_MODE_KEY) || "auto";
+  return ["auto", "on", "off"].includes(value) ? value : "auto";
+}
+
+function saveThinkingMode(value) {
+  localStorage.setItem(THINKING_MODE_KEY, value);
+}
+
+function setThinkingMode(value) {
+  thinkingMode = ["auto", "on", "off"].includes(value) ? value : "auto";
+  saveThinkingMode(thinkingMode);
+  const labels = {
+    auto: "思考: 自动",
+    on: "思考: 开启",
+    off: "思考: 关闭",
+  };
+  thinkingModeButtons.forEach((button) => {
+    button.classList.add("active");
+    button.textContent = labels[thinkingMode];
+  });
+}
+
+function cycleThinkingMode() {
+  const modes = ["auto", "on", "off"];
+  const currentIndex = modes.indexOf(thinkingMode);
+  const nextMode = modes[(currentIndex + 1) % modes.length];
+  setThinkingMode(nextMode);
+}
 
 function loadSessions() {
   try {
@@ -544,6 +1007,302 @@ function renderSessions() {
     row.appendChild(del);
     sessionList.appendChild(row);
   });
+}
+
+function renderSkills(skills = []) {
+  skillsCache = skills;
+  skillsList.innerHTML = "";
+  if (!skills.length) {
+    const empty = document.createElement("div");
+    empty.className = "skill-empty";
+    empty.textContent = "当前没有已加载的 skill。";
+    skillsList.appendChild(empty);
+    return;
+  }
+
+  skills.forEach((skill) => {
+    const card = document.createElement("details");
+    card.className = "skill-card";
+    card.classList.toggle("disabled", skill.enabled === false);
+    card.open = false;
+
+    const summary = document.createElement("summary");
+    summary.className = "skill-summary";
+
+    const summaryLeft = document.createElement("div");
+    summaryLeft.className = "skill-summary-left";
+
+    const head = document.createElement("div");
+    head.className = "skill-card-head";
+
+    const left = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "skill-name";
+    name.textContent = skill.name || "(unnamed)";
+    left.appendChild(name);
+
+    const meta = document.createElement("div");
+    meta.className = "skill-dir";
+    meta.textContent = (skill.pack_dir || "").split("/").slice(-2).join("/");
+    left.appendChild(meta);
+
+    const status = document.createElement("div");
+    status.className = `skill-status ${skill.enabled === false ? "off" : "on"}`;
+    status.textContent = skill.enabled === false ? "已禁用" : "已启用";
+
+    head.appendChild(left);
+    summaryLeft.appendChild(head);
+    summary.appendChild(summaryLeft);
+    const summaryRight = document.createElement("div");
+    summaryRight.className = "skill-summary-right";
+    const caret = document.createElement("span");
+    caret.className = "skill-caret";
+    summaryRight.appendChild(status);
+    summaryRight.appendChild(caret);
+    summary.appendChild(summaryRight);
+
+    const body = document.createElement("div");
+    body.className = "skill-body";
+    const desc = document.createElement("div");
+    desc.className = "skill-desc";
+    desc.textContent = skill.description || "无说明";
+
+    const when = document.createElement("div");
+    when.className = "skill-when";
+    if (skill.when_to_use) {
+      when.textContent = `何时使用: ${skill.when_to_use}`;
+    }
+
+    const command = document.createElement("div");
+    command.className = "skill-command";
+    if (skill.has_runtime === false) {
+      command.textContent = "命令: 无固定入口，由模型阅读 SKILL.md 后自行推导。";
+    } else {
+      command.innerHTML = `命令: <code>${(skill.command_template || []).join(" ")}</code>`;
+    }
+
+    const metaTags = document.createElement("div");
+    metaTags.className = "skill-tags";
+    const tags = [];
+    const availability = skill.availability || {};
+    if (skill.user_invocable === true) tags.push("可手动调用");
+    if (skill.user_invocable === false) tags.push("仅模型调用");
+    if (skill.disable_model_invocation === true) tags.push("禁模型调用");
+    if (skill.primary_env) tags.push(`主环境变量: ${skill.primary_env}`);
+    (skill.required_env || []).forEach((item) => tags.push(`ENV: ${item}`));
+    (skill.required_bins || []).forEach((item) => tags.push(`BIN: ${item}`));
+    (availability.missing_env || []).forEach((item) => tags.push(`缺少环境变量: ${item}`));
+    (availability.missing_bins || []).forEach((item) => tags.push(`缺少命令: ${item}`));
+    tags.forEach((label) => {
+      const tag = document.createElement("span");
+      tag.className = "skill-tag";
+      if (label.startsWith("缺少")) {
+        tag.classList.add("warn");
+      }
+      tag.textContent = label;
+      metaTags.appendChild(tag);
+    });
+
+    const skillMd = document.createElement("div");
+    skillMd.className = "skill-md";
+    skillMd.innerHTML = `<div class="skill-md-title">SKILL.md</div><div class="skill-md-body"></div>`;
+    skillMd.querySelector(".skill-md-body").innerHTML = marked.parse(normalizeSkillMarkdown(skill.skill_md_content || ""));
+
+    const actions = document.createElement("div");
+    actions.className = "skill-actions";
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.textContent = skill.enabled === false ? "启用" : "禁用";
+    toggleBtn.onclick = async () => {
+      await toggleSkillFromPanel(skill.name, skill.enabled === false);
+    };
+
+    actions.appendChild(toggleBtn);
+    if (skill.user_invocable !== false) {
+      const runBtn = document.createElement("button");
+      runBtn.type = "button";
+      runBtn.textContent = "运行";
+      runBtn.disabled = skill.enabled === false || availability.available === false;
+      runBtn.onclick = async () => {
+        const skillInput = window.prompt(`运行 skill: ${skill.name}\n请输入参数：`, "");
+        if (skillInput === null) return;
+        await runSkillFromPanel(skill.name, skillInput);
+      };
+      actions.appendChild(runBtn);
+    }
+    body.appendChild(desc);
+    if (skill.when_to_use) {
+      body.appendChild(when);
+    }
+    body.appendChild(command);
+    if (tags.length) {
+      body.appendChild(metaTags);
+    }
+    body.appendChild(skillMd);
+    body.appendChild(actions);
+    card.appendChild(summary);
+    card.appendChild(body);
+    skillsList.appendChild(card);
+  });
+}
+
+function formatTraceValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function renderTrace(trace = []) {
+  traceCache = trace;
+  traceList.innerHTML = "";
+  traceCount.textContent = `${trace.length} 条`;
+
+  if (!currentSessionId) {
+    const empty = document.createElement("div");
+    empty.className = "trace-empty";
+    empty.textContent = "请选择会话后查看调用轨迹。";
+    traceList.appendChild(empty);
+    return;
+  }
+
+  if (!trace.length) {
+    const empty = document.createElement("div");
+    empty.className = "trace-empty";
+    empty.textContent = "这个会话暂时还没有工具调用轨迹。";
+    traceList.appendChild(empty);
+    return;
+  }
+
+  trace.slice().reverse().forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "trace-item";
+
+    const head = document.createElement("div");
+    head.className = "trace-item-head";
+
+    const event = document.createElement("div");
+    event.className = "trace-event";
+    event.textContent = entry.event || "(unknown)";
+
+    const time = document.createElement("div");
+    time.className = "trace-time";
+    time.textContent = entry.time || "";
+
+    head.appendChild(event);
+    head.appendChild(time);
+
+    const data = document.createElement("pre");
+    data.className = "trace-data";
+    data.textContent = formatTraceValue(entry.data || {});
+
+    item.appendChild(head);
+    item.appendChild(data);
+    traceList.appendChild(item);
+  });
+}
+
+function normalizeSkillMarkdown(text) {
+  const raw = (text || "").replace(/\r\n/g, "\n");
+  if (!raw.startsWith("---\n")) {
+    return raw;
+  }
+  const end = raw.indexOf("\n---\n", 4);
+  if (end < 0) {
+    return raw;
+  }
+  return raw.slice(end + 5).trim();
+}
+
+async function refreshSkills() {
+  try {
+    reloadSkillsBtn.disabled = true;
+    const data = await fetchJson("/skills");
+    renderSkills(data.skills || []);
+  } catch (err) {
+    skillsList.innerHTML = `<div class="skill-empty">读取 skill 失败: ${err}</div>`;
+  } finally {
+    reloadSkillsBtn.disabled = false;
+  }
+}
+
+async function reloadSkills() {
+  try {
+    reloadSkillsBtn.disabled = true;
+    const data = await fetchJson("/skills/reload", { method: "POST" });
+    renderSkills(data.skills || []);
+    addMessage("ai", `Skills 已重载，共 ${data.skills?.length || 0} 个。`);
+  } catch (err) {
+    addMessage("ai", `Skill reload 失败: ${err}`);
+  } finally {
+    reloadSkillsBtn.disabled = false;
+  }
+}
+
+async function refreshTrace() {
+  if (!currentSessionId) {
+    renderTrace([]);
+    return;
+  }
+  try {
+    reloadTraceBtn.disabled = true;
+    const data = await fetchJson(`/session/trace?session_id=${encodeURIComponent(currentSessionId)}`);
+    renderTrace(data.trace || []);
+  } catch (err) {
+    traceList.innerHTML = `<div class="trace-empty">读取 trace 失败: ${err}</div>`;
+    traceCount.textContent = "0 条";
+  } finally {
+    reloadTraceBtn.disabled = false;
+  }
+}
+
+async function runSkillFromPanel(skillName, skillInput = "") {
+  if (!currentSessionId) {
+    await createNewSession(true);
+    if (!currentSessionId) return;
+  }
+  addMessage("user", `:skill ${skillName}${skillInput ? ` ${skillInput}` : ""}`);
+  const aiMessage = addAssistantMessage("", "");
+  try {
+    const data = await fetchJson("/skills/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentSessionId,
+        skill: skillName,
+        input: skillInput,
+      }),
+    });
+    aiMessage.setAnswer(data.result || "(no output)");
+    await refreshTrace();
+  } catch (err) {
+    aiMessage.setAnswer(`Skill 执行失败: ${err}`);
+    await refreshTrace();
+  }
+}
+
+async function toggleSkillFromPanel(skillName, enabled) {
+  try {
+    const data = await fetchJson("/skills/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        skill: skillName,
+        enabled,
+      }),
+    });
+    const nextSkills = skillsCache.map((skill) =>
+      skill.name === skillName ? data.skill : skill
+    );
+    renderSkills(nextSkills);
+    addMessage("ai", `Skill ${skillName} 已${enabled ? "启用" : "禁用"}。`);
+  } catch (err) {
+    addMessage("ai", `切换 skill 失败: ${err}`);
+  }
 }
 
 function scrollBottom() {
@@ -686,8 +1445,10 @@ async function switchSession(sessionId) {
   try {
     const data = await fetchJson(`/session/history?session_id=${encodeURIComponent(sessionId)}`);
     renderHistory(data.messages || []);
+    await refreshTrace();
   } catch (err) {
     renderHistory([]);
+    renderTrace([]);
     addMessage("ai", `读取会话历史失败: ${err}`);
   }
 }
@@ -737,6 +1498,7 @@ async function deleteSession(sessionId) {
     localStorage.removeItem(SESSION_KEY);
     setWelcomeMode(true);
     renderHistory([]);
+    renderTrace([]);
   }
   renderSessions();
 }
@@ -777,6 +1539,7 @@ async function sendMessage(msg, source) {
       body: JSON.stringify({
         message: msg,
         session_id: currentSessionId,
+        thinking_mode: thinkingMode,
       }),
     });
 
@@ -855,8 +1618,10 @@ async function sendMessage(msg, source) {
       ? currentMeta.title
       : deriveTitle(msg);
     upsertSession({ id: currentSessionId, title, updatedAt: Date.now() / 1000 });
+    await refreshTrace();
   } catch (err) {
     aiMessage.setAnswer(`网络错误: ${err}`);
+    await refreshTrace();
   } finally {
     sendBtn.disabled = false;
     welcomeSendBtn.disabled = false;
@@ -879,10 +1644,20 @@ welcomeInput.addEventListener("keydown", (event) => {
   }
 });
 
+thinkingModeButtons.forEach((button) => {
+  button.addEventListener("click", cycleThinkingMode);
+});
+
+reloadSkillsBtn.addEventListener("click", reloadSkills);
+reloadTraceBtn.addEventListener("click", refreshTrace);
+
 (async () => {
   sessions = loadSessions();
+  setThinkingMode(loadThinkingMode());
   renderSessions();
+  await refreshSkills();
   await syncSessionsFromServer();
+  renderTrace([]);
   currentSessionId = "";
   localStorage.removeItem(SESSION_KEY);
   setWelcomeMode(true);

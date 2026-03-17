@@ -14,6 +14,7 @@ KEY_ENV_MAP = {
     "model_name": "MODEL_NAME",
     "model_base_url": "MODEL_BASE_URL",
     "model_api_key": "MODEL_API_KEY",
+    "thinking_mode": "THINKING_MODE",
     "system_prompt": "SYSTEM_PROMPT",
     "enable_shell_skill": "ENABLE_SHELL_SKILL",
     "shell_allow_operators": "SHELL_ALLOW_OPERATORS",

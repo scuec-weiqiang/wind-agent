@@ -14,7 +14,7 @@ from app.chat import (
     DEFAULT_PROVIDER,
     DEFAULT_URL,
 )
-from skills.manager import SkillManager, SkillNotFound, SkillRegistryError
+from app.skill_manager import SkillManager, SkillNotFound, SkillRegistryError
 
 COMMAND_PREFIX = ":"
 
