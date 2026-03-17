@@ -1,74 +1,108 @@
-import requests
 import json
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
+import requests
 
-messages = []
+StreamCallback = Callable[[str], None]
 
-def ask(user_msg):
-    while True:
-        messages.append({
-            "role":"user",
-            "content": user_msg
-        })
+DEFAULT_MODEL = "qwen3.5:9b"
+DEFAULT_URL = "http://localhost:11434/api/chat"
 
-        data = {
-            "model": "qwen3.5:9b",
-            "messages": messages,
-            "stream": False,
-            "think": False
+
+@dataclass
+class ChatSession:
+    model: str = DEFAULT_MODEL
+    base_url: str = DEFAULT_URL
+    think: bool = False
+    system_prompt: Optional[str] = None
+    timeout: int = 120
+    messages: List[Dict[str, str]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.reset(self.system_prompt)
+
+    def reset(self, system_prompt: Optional[str] = None) -> None:
+        """Resets the conversation while preserving an optional system prompt."""
+        if system_prompt is not None:
+            self.system_prompt = system_prompt
+        self.messages = []
+        if self.system_prompt:
+            self.messages.append({"role": "system", "content": self.system_prompt})
+
+    def _build_payload(self, stream: bool) -> Dict[str, Any]:
+        return {
+            "model": self.model,
+            "messages": self.messages,
+            "stream": stream,
+            "think": self.think,
         }
 
-        r = requests.post(OLLAMA_URL, json=data, stream=True)
+    def add_user_message(self, content: str) -> None:
+        self.messages.append({"role": "user", "content": content})
 
-        reply = r.json()["message"]["content"]
+    def add_assistant_message(self, content: str) -> None:
+        self.messages.append({"role": "assistant", "content": content})
 
-        messages.append({
-            "role": "assistant",
-            "content": reply
-        })
-
+    def ask(self, user_content: str) -> str:
+        """Sends a user message and waits for the full completion."""
+        self.add_user_message(user_content)
+        response = requests.post(
+            self.base_url,
+            json=self._build_payload(stream=False),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        reply = data["message"]["content"]
+        self.add_assistant_message(reply)
         return reply
 
-def ask_stream(user_msg):
-    messages.append({
-        "role": "user",
-        "content": user_msg
-    })
+    def stream_chat(
+        self, user_content: str, on_chunk: Optional[StreamCallback] = None
+    ) -> str:
+        """Streams the assistant reply while optionally emitting chunks via callback."""
+        self.add_user_message(user_content)
+        response = requests.post(
+            self.base_url,
+            json=self._build_payload(stream=True),
+            stream=True,
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        reply = ""
 
-    r = requests.post(
-        OLLAMA_URL,
-        json={
-            "model": "qwen3.5:9b",
-            "messages": messages,
-            "stream": True,
-            "think": False
-        },
-        stream=True
-    )
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
 
-    reply = ""
+            if "message" in payload:
+                chunk = payload["message"].get("content", "")
+                if chunk:
+                    if on_chunk:
+                        on_chunk(chunk)
+                    reply += chunk
 
-    for line in r.iter_lines():
+            if payload.get("done"):
+                break
 
-        if not line:
-            continue
+        self.add_assistant_message(reply)
+        return reply
 
-        data = json.loads(line)
+    def history(self) -> Iterable[Dict[str, str]]:
+        yield from self.messages
 
-        if "message" in data:
-            content = data["message"].get("content", "")
-            print(content, end="", flush=True)   # 实时输出
-            reply += content
 
-        if data.get("done"):
-            break
+_default_session = ChatSession()
 
-    print()
 
-    messages.append({
-        "role": "assistant",
-        "content": reply
-    })
+def ask(user_msg: str) -> str:
+    return _default_session.ask(user_msg)
 
-    return reply  
+
+def ask_stream(user_msg: str, on_chunk: Optional[StreamCallback] = None) -> str:
+    return _default_session.stream_chat(user_msg, on_chunk=on_chunk)

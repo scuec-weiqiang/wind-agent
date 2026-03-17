@@ -1,33 +1,78 @@
-from flask import Flask, request, Response
-import requests, json
+from __future__ import annotations
 
-app = Flask(__name__)
+import json
+import os
 
-OLLAMA = "http://localhost:11434/api/chat"
+import requests
+from flask import Flask, Response, request, send_from_directory
 
-@app.route("/v1/chat/completions", methods=["POST"])
-def chat():
-    data = request.json
-    messages = data["messages"]
+DEFAULT_MODEL = "qwen3.5:9b"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
+SYSTEM_PROMPT = os.environ.get(
+    "SYSTEM_PROMPT",
+    "You are a helpful agent coordinating between the user and available skills.",
+)
 
-    r = requests.post(
-        OLLAMA,
+app = Flask(__name__, static_folder=".", static_url_path="")
+
+
+def _build_messages(user_input: str) -> list[dict[str, str]]:
+    messages = []
+    if SYSTEM_PROMPT:
+        messages.append({"role": "system", "content": SYSTEM_PROMPT})
+
+    messages.append({"role": "user", "content": user_input})
+    return messages
+
+
+def _stream_ollama(messages: list[dict[str, str]]) -> Response:
+    resp = requests.post(
+        OLLAMA_URL,
         json={
-            "model": "qwen3.5:9b",
+            "model": DEFAULT_MODEL,
             "messages": messages,
-            "stream": True
+            "stream": True,
+            "think": False,
         },
-        stream=True
+        stream=True,
+        timeout=120,
     )
+    resp.raise_for_status()
 
     def generate():
-        for line in r.iter_lines():
-            if line:
-                obj = json.loads(line)
-                token = obj["message"]["content"]
+        for line in resp.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
 
-                yield f"data: {json.dumps({'choices':[{'delta':{'content':token}}]})}\n\n"
+            if "message" in payload:
+                chunk = payload["message"].get("content", "")
+                if chunk:
+                    yield chunk
 
-    return Response(generate(), mimetype="text/event-stream")
+            if payload.get("done"):
+                break
 
-app.run(port=5000)
+    return Response(generate(), mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_input = request.json.get("message", "").strip()
+    if not user_input:
+        return Response("No message provided.", status=400)
+
+    messages = _build_messages(user_input)
+    return _stream_ollama(messages)
+
+
+@app.route("/")
+def homepage():
+    return send_from_directory(".", "index.html")
+
+
+if __name__ == "__main__":
+    app.run(port=5000)
