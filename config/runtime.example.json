@@ -1,0 +1,12 @@
+{
+  "model_provider": "ollama",
+  "model_name": "qwen3.5:9b",
+  "model_base_url": "http://localhost:11434/api/chat",
+  "model_api_key": "",
+  "system_prompt": "You are a helpful agent coordinating between the user and available skills.",
+  "shell_timeout": 0,
+  "enable_thinking": true,
+  "env": {
+    "OPENAI_API_KEY": ""
+  }
+}

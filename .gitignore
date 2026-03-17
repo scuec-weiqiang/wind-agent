@@ -4,3 +4,6 @@ __pycache__/
 # local session data
 /data/sessions/*.json
 !/data/sessions/.gitkeep
+
+# local runtime config (may contain secrets)
+/config/runtime.json

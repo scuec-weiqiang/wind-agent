@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import argparse
 
+from app.config import load_runtime_config
+
 
 def main() -> None:
+    load_runtime_config()
+
     parser = argparse.ArgumentParser(description="Wind Agent entrypoint")
     parser.add_argument("mode", nargs="?", default="web", choices=["web", "cli"])
     args = parser.parse_args()

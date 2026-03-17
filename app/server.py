@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import time
 import uuid
@@ -13,24 +12,38 @@ from pathlib import Path
 import requests
 from flask import Flask, Response, request, send_from_directory
 
-from app.chat import ChatSession, DEFAULT_MODEL
+from app.chat import (
+    ChatSession,
+    DEFAULT_MODEL,
+    DEFAULT_OPENAI_COMPAT_URL,
+    DEFAULT_PROVIDER,
+    DEFAULT_URL,
+)
 from skills.manager import SkillManager, SkillRegistryError
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
+MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+MODEL_NAME = os.environ.get("MODEL_NAME", os.environ.get("OLLAMA_MODEL", DEFAULT_MODEL))
+MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", os.environ.get("OLLAMA_URL", "")).strip()
+if not MODEL_BASE_URL:
+    MODEL_BASE_URL = DEFAULT_OPENAI_COMPAT_URL if MODEL_PROVIDER in {"openai", "openai_compatible", "openai-compatible"} else DEFAULT_URL
+MODEL_API_KEY = os.environ.get("MODEL_API_KEY", os.environ.get("OPENAI_API_KEY", "")).strip()
 SYSTEM_PROMPT = os.environ.get(
     "SYSTEM_PROMPT",
     "You are a helpful agent coordinating between the user and available skills.",
 )
-TOOL_ROUTER_PROMPT = (
-    "You are a command planner. Convert user requests into safe terminal commands in JSON only. "
-    "Output one of:\n"
+SKILL_ROUTER_PROMPT_TEMPLATE = (
+    "You are a skill router. Decide whether to call skill packs.\n"
+    "Return JSON only, one of:\n"
     '{"action":"none"}\n'
-    '{"action":"run_time"}\n'
-    '{"action":"run_command","command":"...","message":"..."}\n'
-    '{"action":"run_commands","commands":["...","..."],"message":"..."}\n'
-    "Rules: no markdown; no shell operators (>, <, |, &&, ||, ;); "
-    "prefer python3 -c for file writes; at most 3 commands; "
-    "only for concrete local task execution. If unsure use action=none."
+    '{"action":"use_skill","skill":"<name>","input":"<input for skill>"}\n'
+    '{"action":"use_skills","calls":[{"skill":"<name>","input":"..."},{"skill":"<name>","input":"..."}]}\n'
+    "Rules:\n"
+    "- no markdown, no prose, JSON only.\n"
+    "- if no skill fits, return action=none.\n"
+    "- for shell skill input, output executable command text only.\n"
+    "- at most 3 calls for use_skills.\n\n"
+    "Available skills:\n"
+    "<<SKILL_CATALOG>>\n"
 )
 MAX_SESSIONS = int(os.environ.get("MAX_WEB_SESSIONS", "100"))
 DEFAULT_SESSION_ID = "default"
@@ -75,8 +88,10 @@ def _new_conversation_state() -> ConversationState:
     now = time.time()
     return ConversationState(
         assistant=ChatSession(
-            model=DEFAULT_MODEL,
-            base_url=OLLAMA_URL,
+            model=MODEL_NAME,
+            base_url=MODEL_BASE_URL,
+            provider=MODEL_PROVIDER,
+            api_key=MODEL_API_KEY,
             system_prompt=SYSTEM_PROMPT,
             think=ENABLE_THINKING,
         ),
@@ -245,43 +260,17 @@ def _run_system_command(command: str) -> str:
     command = command.strip()
     if not command:
         return "Usage: execute command <cmd>"
-
-    try:
-        tokens = shlex.split(command)
-    except ValueError as exc:
-        return f"Invalid command: {exc}"
-    if not tokens:
-        return "No command provided."
-
-    if any(token in {">", "<", "|", "&&", "||", ";"} for token in tokens):
-        return (
-            "Command contains shell operators (>, <, |, &&, ||, ;) which are not supported. "
-            "Use a direct executable command."
-        )
-
-    allowed_prefixes = [
-        part.strip()
-        for part in os.environ.get(
-            "SHELL_ALLOWED_PREFIXES",
-            "ls,pwd,cat,echo,whoami,date,rg,touch,mkdir,tee,printf,gcc,cc,clang,make,python3,head,tail,wc,sed,chmod",
-        ).split(",")
-        if part.strip()
-    ]
-    timeout = int(os.environ.get("SHELL_TIMEOUT", "20"))
+    timeout = int(os.environ.get("SHELL_TIMEOUT", "0"))
+    timeout_value = timeout if timeout > 0 else None
     cwd = os.environ.get("SHELL_CWD") or str(PROJECT_ROOT)
-    executable = tokens[0]
-    is_local_binary = executable.startswith("./")
-    is_local_script = executable.endswith(".sh") and (Path(cwd) / executable).exists()
-    if allowed_prefixes and executable not in allowed_prefixes and not is_local_binary and not is_local_script:
-        return "Command blocked. Allowed prefixes: " + ", ".join(allowed_prefixes)
     try:
         result = subprocess.run(
-            tokens,
+            ["bash", "-lc", command],
             shell=False,
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=timeout,
+            timeout=timeout_value,
         )
     except subprocess.TimeoutExpired:
         return f"Command timed out after {timeout}s."
@@ -323,8 +312,14 @@ def _parse_router_json(raw: str) -> dict | None:
 
 
 def _plan_system_commands(user_input: str) -> dict | None:
+    if not skill_manager or not list(skill_manager.names()):
+        return None
+
+    router_prompt = SKILL_ROUTER_PROMPT_TEMPLATE.replace(
+        "<<SKILL_CATALOG>>", skill_manager.router_catalog()
+    )
     messages = [
-        {"role": "system", "content": TOOL_ROUTER_PROMPT},
+        {"role": "system", "content": router_prompt},
         {
             "role": "user",
             "content": (
@@ -335,16 +330,26 @@ def _plan_system_commands(user_input: str) -> dict | None:
         },
     ]
     payload = {
-        "model": DEFAULT_MODEL,
+        "model": MODEL_NAME,
         "messages": messages,
         "stream": False,
-        "think": False,
     }
+    if MODEL_PROVIDER == "ollama":
+        payload["think"] = False
     try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
+        headers = {}
+        if MODEL_PROVIDER in {"openai", "openai_compatible", "openai-compatible"}:
+            headers["Content-Type"] = "application/json"
+            if MODEL_API_KEY:
+                headers["Authorization"] = f"Bearer {MODEL_API_KEY}"
+        resp = requests.post(MODEL_BASE_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         data = resp.json()
-        raw = data.get("message", {}).get("content", "")
+        if MODEL_PROVIDER in {"openai", "openai_compatible", "openai-compatible"}:
+            choices = data.get("choices") or []
+            raw = (choices[0].get("message") or {}).get("content", "") if choices else ""
+        else:
+            raw = data.get("message", {}).get("content", "")
     except Exception:
         return None
     return _parse_router_json(raw)
@@ -355,11 +360,45 @@ def _run_planned_commands(decision: dict) -> str | None:
     if action == "none":
         return None
 
+    if action == "use_skill":
+        if not skill_manager:
+            return None
+        skill_name = str(decision.get("skill", "")).strip()
+        skill_input = str(decision.get("input", "")).strip()
+        if not skill_name:
+            return None
+        try:
+            return skill_manager.execute(skill_name, skill_input)
+        except Exception:
+            return None
+
+    if action == "use_skills":
+        if not skill_manager:
+            return None
+        calls = decision.get("calls")
+        if not isinstance(calls, list):
+            return None
+        calls = calls[:3]
+        outputs: list[str] = []
+        for i, call in enumerate(calls, start=1):
+            if not isinstance(call, dict):
+                continue
+            skill_name = str(call.get("skill", "")).strip()
+            skill_input = str(call.get("input", "")).strip()
+            if not skill_name:
+                continue
+            try:
+                result = skill_manager.execute(skill_name, skill_input)
+            except Exception:
+                result = f"Skill '{skill_name}' execution failed."
+            outputs.append(f"步骤{i}: [{skill_name}] {result}")
+        return "\n\n".join(outputs) if outputs else None
+
+    # Backward compatibility for older router outputs.
     if action == "run_time":
         if not skill_manager or "time" not in set(skill_manager.names()):
             return None
         return f"当前时间：{skill_manager.execute('time', '%Y-%m-%d %H:%M:%S')}"
-
     if action == "run_command":
         command = str(decision.get("command", "")).strip()
         if not command:
@@ -419,42 +458,64 @@ def _stream_chat(session_id: str, state: ConversationState, user_input: str) -> 
         thinking = ""
         try:
             response = requests.post(
-                OLLAMA_URL,
+                state.assistant.base_url,
                 json=state.assistant._build_payload(stream=True),
+                headers=state.assistant._build_headers(),
                 stream=True,
                 timeout=state.assistant.timeout,
             )
             response.raise_for_status()
+            provider = (state.assistant.provider or DEFAULT_PROVIDER).strip().lower()
 
             for line in response.iter_lines(decode_unicode=True):
                 if not line:
                     continue
-                try:
-                    payload = json.loads(line)
-                except json.JSONDecodeError:
+                if provider == "ollama":
+                    try:
+                        payload = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if "message" in payload:
+                        message = payload.get("message", {}) or {}
+                        if isinstance(message, dict):
+                            think_chunk = (
+                                message.get("thinking")
+                                or message.get("reasoning_content")
+                                or payload.get("thinking")
+                                or payload.get("reasoning_content")
+                                or ""
+                            )
+                            if think_chunk:
+                                thinking += think_chunk
+                                yield f"event: thinking\ndata: {json.dumps({'text': think_chunk}, ensure_ascii=False)}\n\n"
+
+                            chunk = message.get("content", "") or ""
+                            if chunk:
+                                reply += chunk
+                                yield f"event: answer\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
+
+                    if payload.get("done"):
+                        break
                     continue
 
-                if "message" in payload:
-                    message = payload.get("message", {}) or {}
-                    if isinstance(message, dict):
-                        think_chunk = (
-                            message.get("thinking")
-                            or message.get("reasoning_content")
-                            or payload.get("thinking")
-                            or payload.get("reasoning_content")
-                            or ""
-                        )
-                        if think_chunk:
-                            thinking += think_chunk
-                            yield f"event: thinking\ndata: {json.dumps({'text': think_chunk}, ensure_ascii=False)}\n\n"
-
-                        chunk = message.get("content", "") or ""
-                        if chunk:
-                            reply += chunk
-                            yield f"event: answer\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
-
-                if payload.get("done"):
+                raw = line.strip()
+                if raw.startswith("data:"):
+                    raw = raw[5:].strip()
+                if raw == "[DONE]":
                     break
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                choices = payload.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                chunk = delta.get("content", "") or ""
+                if chunk:
+                    reply += chunk
+                    yield f"event: answer\ndata: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
         except requests.RequestException as exc:
             reply = f"[network error] {exc}"
             yield f"event: error\ndata: {json.dumps({'text': reply}, ensure_ascii=False)}\n\n"

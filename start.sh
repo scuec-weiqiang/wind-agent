@@ -12,14 +12,19 @@ Usage:
 
 Env:
   PYTHON_BIN   Python interpreter path
-  ENABLE_SHELL_SKILL         Enable shell skill (default: 1)
+  CONFIG_FILE               Runtime config JSON path (default: config/runtime.json)
+  MODEL_PROVIDER            Model provider: ollama | openai_compatible (default: ollama)
+  MODEL_NAME                Model name (fallback: OLLAMA_MODEL)
+  MODEL_BASE_URL            API URL (fallback: OLLAMA_URL)
+  MODEL_API_KEY             API key for compatible providers (fallback: OPENAI_API_KEY)
+  SHELL_TIMEOUT              Shell timeout seconds (0 = unlimited, default: 0)
   OLLAMA_URL   Ollama chat endpoint
   OLLAMA_MODEL Model name for CLI
 HELP
   exit 0
 fi
 
-export ENABLE_SHELL_SKILL="${ENABLE_SHELL_SKILL:-1}"
+export SHELL_TIMEOUT="${SHELL_TIMEOUT:-0}"
 
 case "$MODE" in
   web)

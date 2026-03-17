@@ -7,30 +7,44 @@ from typing import List
 
 import requests
 
-from app.chat import ChatSession, DEFAULT_MODEL, DEFAULT_URL
+from app.chat import (
+    ChatSession,
+    DEFAULT_MODEL,
+    DEFAULT_OPENAI_COMPAT_URL,
+    DEFAULT_PROVIDER,
+    DEFAULT_URL,
+)
 from skills.manager import SkillManager, SkillNotFound, SkillRegistryError
 
 COMMAND_PREFIX = ":"
 
 WELCOME_MESSAGE = textwrap.dedent(
     """\
-    Simplified agent CLI (matches qwen3.5:9b on Ollama).
+    Simplified agent CLI.
     Prefix commands with `:` (e.g. `:skills` or `:skill time`). Type `:help` for a quick list.
-    Use OLLAMA_MODEL/OLLAMA_URL to override the defaults, and SYSTEM_PROMPT to steer the assistant.
+    Use MODEL_PROVIDER/MODEL_NAME/MODEL_BASE_URL/MODEL_API_KEY to switch model vendors.
     """
 )
 
 
 class AgentCLI:
     def __init__(self) -> None:
-        model = os.environ.get("OLLAMA_MODEL", DEFAULT_MODEL)
-        base_url = os.environ.get("OLLAMA_URL", DEFAULT_URL)
+        provider = os.environ.get("MODEL_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+        model = os.environ.get("MODEL_NAME", os.environ.get("OLLAMA_MODEL", DEFAULT_MODEL))
+        base_url = os.environ.get("MODEL_BASE_URL", os.environ.get("OLLAMA_URL", "")).strip()
+        if not base_url:
+            base_url = DEFAULT_OPENAI_COMPAT_URL if provider in {"openai", "openai_compatible", "openai-compatible"} else DEFAULT_URL
+        api_key = os.environ.get("MODEL_API_KEY", os.environ.get("OPENAI_API_KEY", "")).strip()
         system_prompt = os.environ.get(
             "SYSTEM_PROMPT",
             "You are a helpful assistant coordinating skills and answering questions.",
         )
         self.session = ChatSession(
-            model=model, base_url=base_url, system_prompt=system_prompt
+            model=model,
+            base_url=base_url,
+            provider=provider,
+            api_key=api_key,
+            system_prompt=system_prompt,
         )
         self.skill_manager: SkillManager | None = None
         self._load_skills()
