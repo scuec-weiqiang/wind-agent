@@ -675,7 +675,7 @@ body {
 #msg::placeholder, #welcome-msg::placeholder {
   color: #7990a6;
 }
-#send, #welcome-send {
+#send, #welcome-send, #upload-trigger, #welcome-upload-trigger {
   border: none;
   border-radius: 999px;
   width: 42px;
@@ -683,12 +683,16 @@ body {
   min-width: 42px;
   color: #fff;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 14px;
   background: linear-gradient(145deg, var(--accent-1), var(--accent-2));
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(38, 95, 168, 0.34);
 }
-#send:disabled, #welcome-send:disabled {
+#upload-trigger, #welcome-upload-trigger {
+  width: auto;
+  padding: 0 12px;
+}
+#send:disabled, #welcome-send:disabled, #upload-trigger:disabled, #welcome-upload-trigger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
@@ -708,6 +712,16 @@ body {
   font-size: clamp(26px, 3.1vw, 38px);
 }
 .welcome-sub { margin: 0 0 18px; color: var(--muted); }
+.attach-status {
+  margin: 8px auto 0;
+  width: min(860px, 100%);
+  font-size: 12px;
+  color: #36536f;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(53, 98, 148, 0.15);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
 .welcome-row {
   padding: 10px 10px 10px 16px;
 }
@@ -837,8 +851,10 @@ body {
               <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
             </div>
           </div>
+          <button id="welcome-upload-trigger" type="button">上传文件</button>
           <button id="welcome-send" onclick="sendFromWelcome()">↑</button>
         </div>
+        <div id="welcome-attachment-status" class="attach-status hidden"></div>
       </div>
     </section>
 
@@ -850,11 +866,14 @@ body {
             <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
           </div>
         </div>
+        <button id="upload-trigger" type="button">上传文件</button>
         <button id="send" onclick="send()">↑</button>
       </div>
+      <div id="composer-attachment-status" class="attach-status hidden"></div>
     </section>
   </section>
 </div>
+<input id="upload-files-input" type="file" accept=".txt,.md,.csv,.json,.log,.yaml,.yml,.ini,.cfg,.py,.js,.ts,.tsx,.jsx,.java,.c,.cc,.cpp,.h,.hpp,.go,.rs,.sh,.sql,.xml,.html,.css,text/plain,text/csv,application/json,text/markdown" multiple class="hidden" />
 
 <script>
 marked.setOptions({
@@ -873,6 +892,11 @@ const input = document.getElementById("msg");
 const welcomeInput = document.getElementById("welcome-msg");
 const sendBtn = document.getElementById("send");
 const welcomeSendBtn = document.getElementById("welcome-send");
+const uploadBtn = document.getElementById("upload-trigger");
+const welcomeUploadBtn = document.getElementById("welcome-upload-trigger");
+const uploadInput = document.getElementById("upload-files-input");
+const composerAttachmentStatus = document.getElementById("composer-attachment-status");
+const welcomeAttachmentStatus = document.getElementById("welcome-attachment-status");
 const newSessionBtn = document.getElementById("new-session");
 const sessionList = document.getElementById("session-list");
 const sessionChip = document.getElementById("session-chip");
@@ -888,6 +912,7 @@ let currentSessionId = "";
 let thinkingMode = "auto";
 let skillsCache = [];
 let traceCache = [];
+let attachedFiles = [];
 
 function loadThinkingMode() {
   const value = localStorage.getItem(THINKING_MODE_KEY) || "auto";
@@ -954,6 +979,23 @@ function setWelcomeMode(enabled) {
   chat.classList.remove("hidden");
   composer.classList.remove("hidden");
   sessionChip.textContent = `Session: ${currentSessionId ? currentSessionId.slice(0, 8) : "-"}`;
+}
+
+function renderAttachmentStatus() {
+  const names = attachedFiles.map((item) => item.name || item.file_id);
+  const text = names.length
+    ? `已附加 ${names.length} 个文件：${names.join("，")}`
+    : "";
+  [composerAttachmentStatus, welcomeAttachmentStatus].forEach((el) => {
+    if (!el) return;
+    if (!text) {
+      el.classList.add("hidden");
+      el.textContent = "";
+      return;
+    }
+    el.textContent = text;
+    el.classList.remove("hidden");
+  });
 }
 
 function upsertSession(meta) {
@@ -1260,6 +1302,26 @@ async function refreshTrace() {
   }
 }
 
+async function refreshAttachments() {
+  if (!currentSessionId) {
+    attachedFiles = [];
+    renderAttachmentStatus();
+    return;
+  }
+  try {
+    const data = await fetchJson(`/session/attachments?session_id=${encodeURIComponent(currentSessionId)}`);
+    attachedFiles = (data.files || []).map((item) => ({
+      file_id: item.file_id,
+      name: item.file_id,
+      size: item.size,
+    }));
+    renderAttachmentStatus();
+  } catch {
+    attachedFiles = [];
+    renderAttachmentStatus();
+  }
+}
+
 async function runSkillFromPanel(skillName, skillInput = "") {
   if (!currentSessionId) {
     await createNewSession(true);
@@ -1438,6 +1500,8 @@ async function syncSessionsFromServer() {
 async function switchSession(sessionId) {
   if (!sessionId) return;
   currentSessionId = sessionId;
+  attachedFiles = [];
+  renderAttachmentStatus();
   localStorage.setItem(SESSION_KEY, currentSessionId);
   setWelcomeMode(false);
   renderSessions();
@@ -1445,9 +1509,11 @@ async function switchSession(sessionId) {
   try {
     const data = await fetchJson(`/session/history?session_id=${encodeURIComponent(sessionId)}`);
     renderHistory(data.messages || []);
+    await refreshAttachments();
     await refreshTrace();
   } catch (err) {
     renderHistory([]);
+    await refreshAttachments();
     renderTrace([]);
     addMessage("ai", `读取会话历史失败: ${err}`);
   }
@@ -1466,6 +1532,8 @@ async function createNewSession(switchNow = true) {
     upsertSession({ id: sessionId, title: data.title || "新会话", updatedAt: data.updated_at });
 
     if (switchNow) {
+      attachedFiles = [];
+      renderAttachmentStatus();
       await switchSession(sessionId);
     }
   } catch (err) {
@@ -1495,6 +1563,8 @@ async function deleteSession(sessionId) {
 
   if (currentSessionId === sessionId) {
     currentSessionId = "";
+    attachedFiles = [];
+    renderAttachmentStatus();
     localStorage.removeItem(SESSION_KEY);
     setWelcomeMode(true);
     renderHistory([]);
@@ -1509,6 +1579,73 @@ async function send() {
 
 async function sendFromWelcome() {
   await sendMessage(welcomeInput.value.trim(), "welcome");
+}
+
+async function uploadAndAnalyze() {
+  if (!currentSessionId) {
+    await createNewSession(true);
+    if (!currentSessionId) return;
+  }
+  uploadInput.value = "";
+  uploadInput.click();
+}
+
+async function handleSelectedUploads() {
+  const files = Array.from(uploadInput.files || []);
+  if (!files.length) return;
+
+  if (!currentSessionId) {
+    await createNewSession(true);
+    if (!currentSessionId) return;
+  }
+
+  const formData = new FormData();
+  formData.append("session_id", currentSessionId);
+  files.forEach((file) => formData.append("files", file));
+
+  sendBtn.disabled = true;
+  welcomeSendBtn.disabled = true;
+  uploadBtn.disabled = true;
+  welcomeUploadBtn.disabled = true;
+  newSessionBtn.disabled = true;
+
+  try {
+    const response = await fetch("/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      addMessage("ai", `上传失败: ${response.status} ${errText}`);
+      return;
+    }
+    const payload = await response.json();
+    if (!payload.ok) {
+      addMessage("ai", `上传失败: ${payload.error || "未知错误"}`);
+      return;
+    }
+    const newFiles = payload.saved_files || [];
+    const ids = payload.attachment_ids || [];
+    const byId = new Map(attachedFiles.map((item) => [item.file_id, item]));
+    newFiles.forEach((item) => byId.set(item.file_id, item));
+    attachedFiles = ids.length ? ids.map((id) => byId.get(id) || { file_id: id, name: id }) : Array.from(byId.values());
+    renderAttachmentStatus();
+    const fileCount = newFiles.length;
+    const rejected = (payload.rejected_files || []).length;
+    addMessage(
+      "ai",
+      `上传完成：新增 ${fileCount} 个文本文件${rejected ? `，拒绝 ${rejected} 个非文本文件` : ""}。你现在可以直接提问文件内容。`
+    );
+  } catch (err) {
+    addMessage("ai", `上传失败: ${err}`);
+  } finally {
+    sendBtn.disabled = false;
+    welcomeSendBtn.disabled = false;
+    uploadBtn.disabled = false;
+    welcomeUploadBtn.disabled = false;
+    newSessionBtn.disabled = false;
+    uploadInput.value = "";
+  }
 }
 
 async function sendMessage(msg, source) {
@@ -1530,6 +1667,8 @@ async function sendMessage(msg, source) {
 
   sendBtn.disabled = true;
   welcomeSendBtn.disabled = true;
+  uploadBtn.disabled = true;
+  welcomeUploadBtn.disabled = true;
   newSessionBtn.disabled = true;
 
   try {
@@ -1540,6 +1679,7 @@ async function sendMessage(msg, source) {
         message: msg,
         session_id: currentSessionId,
         thinking_mode: thinkingMode,
+        attachment_ids: attachedFiles.map((item) => item.file_id),
       }),
     });
 
@@ -1625,6 +1765,8 @@ async function sendMessage(msg, source) {
   } finally {
     sendBtn.disabled = false;
     welcomeSendBtn.disabled = false;
+    uploadBtn.disabled = false;
+    welcomeUploadBtn.disabled = false;
     newSessionBtn.disabled = false;
     input.focus();
   }
@@ -1650,6 +1792,9 @@ thinkingModeButtons.forEach((button) => {
 
 reloadSkillsBtn.addEventListener("click", reloadSkills);
 reloadTraceBtn.addEventListener("click", refreshTrace);
+uploadBtn.addEventListener("click", uploadAndAnalyze);
+welcomeUploadBtn.addEventListener("click", uploadAndAnalyze);
+uploadInput.addEventListener("change", handleSelectedUploads);
 
 (async () => {
   sessions = loadSessions();
@@ -1657,6 +1802,7 @@ reloadTraceBtn.addEventListener("click", refreshTrace);
   renderSessions();
   await refreshSkills();
   await syncSessionsFromServer();
+  renderAttachmentStatus();
   renderTrace([]);
   currentSessionId = "";
   localStorage.removeItem(SESSION_KEY);

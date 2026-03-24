@@ -7,6 +7,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
+from difflib import get_close_matches
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -20,6 +22,31 @@ class SkillNotFound(SkillRegistryError):
 
     def __init__(self, name: str) -> None:
         super().__init__(f"Skill '{name}' was not found.")
+
+
+class SkillNotFoundError(SkillRegistryError):
+    """Raised when no skill can be resolved for a requested name."""
+
+    def __init__(self, requested_name: str, candidates: Optional[list[str]] = None) -> None:
+        self.requested_name = requested_name
+        self.candidates = candidates or []
+        detail = (
+            f"Skill '{requested_name}' was not found."
+            if not self.candidates
+            else f"Skill '{requested_name}' was not found. Did you mean: {', '.join(self.candidates)}"
+        )
+        super().__init__(detail)
+
+
+class SkillAmbiguousError(SkillRegistryError):
+    """Raised when the requested name matches more than one skill."""
+
+    def __init__(self, requested_name: str, candidates: list[str]) -> None:
+        self.requested_name = requested_name
+        self.candidates = candidates
+        super().__init__(
+            f"Skill '{requested_name}' is ambiguous: {', '.join(candidates)}"
+        )
 
 
 class SkillDisabled(SkillRegistryError):
@@ -36,6 +63,25 @@ class SkillUnavailable(SkillRegistryError):
         super().__init__(f"Skill '{name}' is unavailable: {reason}")
 
 
+@dataclass(frozen=True)
+class SkillDefinition:
+    skill_id: str
+    display_name: str
+    aliases: list[str]
+    source_path: str
+
+
+def normalize_skill_key(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    normalized = re.sub(r"[\s_]+", "-", normalized)
+    normalized = re.sub(r"-+", "-", normalized)
+    normalized = re.sub(r"[^a-z0-9-]", "", normalized)
+    normalized = normalized.strip("-")
+    if not normalized:
+        raise ValueError("Skill key is empty after normalization.")
+    return normalized
+
+
 class SkillManager:
     """Loads OpenClaw-style skill packs and exposes execution helpers."""
 
@@ -45,6 +91,7 @@ class SkillManager:
         default_state = root.parent / "data" / "skills_state.json"
         self.state_file = Path(state_file or default_state)
         self.skills: Dict[str, SkillPack] = {}
+        self.alias_index: Dict[str, set[str]] = {}
         self.enabled_state: Dict[str, bool] = {}
         self._load_state()
         self.reload()
@@ -52,6 +99,7 @@ class SkillManager:
     def reload(self) -> None:
         """Reloads all skill packs under skills/."""
         self.skills.clear()
+        self.alias_index.clear()
         if not self.packs_dir.exists():
             raise SkillRegistryError(f"Skill packs directory not found: {self.packs_dir}")
 
@@ -69,21 +117,39 @@ class SkillManager:
 
             parsed = _parse_skill_markdown(skill_md)
             command_template = _resolve_command_template(parsed, pack_dir)
-
-            skill_name = parsed.get("name") or pack_dir.name
-            description = parsed.get("description") or f"Skill pack: {skill_name}"
+            display_name = parsed.get("name") or pack_dir.name
+            skill_id = _resolve_skill_id(parsed, display_name)
+            description = parsed.get("description") or f"Skill pack: {display_name}"
             when_to_use = parsed.get("when_to_use") or ""
+            aliases = _build_skill_aliases(
+                display_name=display_name,
+                skill_id=skill_id,
+                explicit_aliases=parsed.get("aliases"),
+            )
 
-            self.skills[skill_name] = SkillPack(
-                name=skill_name,
+            if skill_id in self.skills:
+                existing = self.skills[skill_id]
+                raise SkillRegistryError(
+                    "Duplicate canonical skill_id detected: "
+                    f"'{skill_id}' from '{pack_dir}' conflicts with '{existing.pack_dir}'."
+                )
+
+            self.skills[skill_id] = SkillPack(
+                skill_id=skill_id,
+                display_name=display_name,
+                aliases=aliases,
                 description=description,
                 when_to_use=when_to_use,
                 pack_dir=pack_dir,
                 skill_md_path=skill_md,
                 command_template=command_template,
                 metadata=parsed.get("metadata"),
-                enabled=self.enabled_state.get(skill_name, True),
+                enabled=self.enabled_state.get(skill_id, True),
             )
+
+        for skill in self.skills.values():
+            for alias in skill.aliases:
+                self.alias_index.setdefault(alias, set()).add(skill.skill_id)
         self._prune_state()
         self._save_state()
 
@@ -94,15 +160,67 @@ class SkillManager:
         return [skill for skill in skills if skill.enabled]
 
     def get(self, name: str) -> "SkillPack":
+        skill, _ = self.resolve_skill(name)
+        return skill
+
+    def resolve_skill(self, requested_name: str) -> tuple["SkillPack", str]:
+        requested_raw = str(requested_name or "").strip()
+        if not requested_raw:
+            raise SkillNotFoundError(requested_name, candidates=self._top_suggestions(""))
+
+        if requested_raw in self.skills:
+            return self.skills[requested_raw], "exact_id"
+
+        direct_alias = self.alias_index.get(requested_raw, set())
+        if len(direct_alias) == 1:
+            resolved_id = next(iter(direct_alias))
+            return self.skills[resolved_id], "exact_alias"
+        if len(direct_alias) > 1:
+            candidates = sorted(direct_alias)
+            raise SkillAmbiguousError(requested_raw, candidates=candidates)
+
         try:
-            return self.skills[name]
-        except KeyError as exc:
-            raise SkillNotFound(name) from exc
+            normalized = normalize_skill_key(requested_raw)
+        except ValueError:
+            raise SkillNotFoundError(requested_raw, candidates=self._top_suggestions(requested_raw))
+
+        normalized_matches: set[str] = set()
+        for skill in self.skills.values():
+            try:
+                if normalize_skill_key(skill.skill_id) == normalized:
+                    normalized_matches.add(skill.skill_id)
+                    continue
+            except ValueError:
+                pass
+            for alias in skill.aliases:
+                try:
+                    if normalize_skill_key(alias) == normalized:
+                        normalized_matches.add(skill.skill_id)
+                        break
+                except ValueError:
+                    continue
+
+        if len(normalized_matches) == 1:
+            resolved_id = next(iter(normalized_matches))
+            return self.skills[resolved_id], "normalized_alias"
+        if len(normalized_matches) > 1:
+            candidates = sorted(normalized_matches)
+            raise SkillAmbiguousError(requested_raw, candidates=candidates)
+
+        raise SkillNotFoundError(
+            requested_raw,
+            candidates=self._top_suggestions(requested_raw),
+        )
 
     def execute(self, name: str, args: Any = "", session: Optional[any] = None) -> str:
-        skill = self.get(name)
+        skill, matched_by = self.resolve_skill(name)
+        print(
+            f"[skill-resolve] requested_name={name!r} "
+            f"resolved_skill_id={skill.skill_id!r} matched_by={matched_by}",
+            flush=True,
+        )
         if not skill.enabled:
-            raise SkillDisabled(name)
+            raise SkillDisabled(skill.skill_id)
         availability = skill.availability()
         if not availability["available"]:
             missing_env = availability["missing_env"]
@@ -112,13 +230,13 @@ class SkillManager:
                 reasons.append(f"missing env: {', '.join(missing_env)}")
             if missing_bins:
                 reasons.append(f"missing bins: {', '.join(missing_bins)}")
-            raise SkillUnavailable(name, "; ".join(reasons) or "requirements not met")
+            raise SkillUnavailable(skill.skill_id, "; ".join(reasons) or "requirements not met")
         return skill.run(args=args, session=session)
 
     def names(self, include_disabled: bool = False) -> Iterable[str]:
         if include_disabled:
             return self.skills.keys()
-        return (skill.name for skill in self.list_skills(include_disabled=False))
+        return (skill.skill_id for skill in self.list_skills(include_disabled=False))
 
     def router_catalog(self) -> str:
         enabled_skills = self.list_skills(include_disabled=False)
@@ -126,7 +244,7 @@ class SkillManager:
             return "(none)"
         lines: list[str] = []
         for skill in enabled_skills:
-            parts = [f"- {skill.name}: {skill.description}"]
+            parts = [f"- {skill.skill_id}: {skill.description}"]
             when = getattr(skill, "when_to_use", "").strip()
             if when:
                 parts.append(f"when: {when}")
@@ -142,7 +260,8 @@ class SkillManager:
         for skill in enabled_skills:
             if skill.disable_model_invocation:
                 continue
-            lines.append(f"- name: {skill.name}")
+            lines.append(f"- skill_id: {skill.skill_id}")
+            lines.append(f"  name: {skill.display_name}")
             lines.append(f"  path: {skill.skill_md_path}")
             lines.append(f"  description: {skill.description}")
             when = (skill.when_to_use or "").strip()
@@ -172,7 +291,7 @@ class SkillManager:
     def set_enabled(self, name: str, enabled: bool) -> "SkillPack":
         skill = self.get(name)
         skill.enabled = bool(enabled)
-        self.enabled_state[skill.name] = skill.enabled
+        self.enabled_state[skill.skill_id] = skill.enabled
         self._save_state()
         return skill
 
@@ -213,14 +332,26 @@ class SkillManager:
         self.enabled_state = {
             name: value for name, value in self.enabled_state.items() if name in known
         }
-        for name, skill in self.skills.items():
-            self.enabled_state[name] = bool(skill.enabled)
+        for skill_id, skill in self.skills.items():
+            self.enabled_state[skill_id] = bool(skill.enabled)
+
+    def _top_suggestions(self, requested_name: str, limit: int = 3) -> list[str]:
+        if not self.skills:
+            return []
+        options = set(self.skills.keys())
+        for skill in self.skills.values():
+            options.update(skill.aliases)
+        key = str(requested_name or "").strip().lower()
+        matches = get_close_matches(key, sorted(options), n=limit, cutoff=0.35)
+        return matches[:limit]
 
 
 class SkillPack:
     def __init__(
         self,
-        name: str,
+        skill_id: str,
+        display_name: str,
+        aliases: list[str],
         description: str,
         when_to_use: str,
         pack_dir: Path,
@@ -229,7 +360,9 @@ class SkillPack:
         metadata: Any = None,
         enabled: bool = True,
     ) -> None:
-        self.name = name
+        self.skill_id = skill_id
+        self.display_name = display_name
+        self.aliases = aliases
         self.description = description
         self.when_to_use = when_to_use
         self.pack_dir = pack_dir
@@ -238,10 +371,24 @@ class SkillPack:
         self.metadata = metadata if isinstance(metadata, dict) else {}
         self.enabled = enabled
 
+    @property
+    def name(self) -> str:
+        """Backward-compatible display label for UI and legacy callers."""
+        return self.display_name
+
+    @property
+    def definition(self) -> SkillDefinition:
+        return SkillDefinition(
+            skill_id=self.skill_id,
+            display_name=self.display_name,
+            aliases=list(self.aliases),
+            source_path=str(self.skill_md_path),
+        )
+
     def run(self, args: Any = "", session=None) -> str:
         if not self.has_runtime:
             raise SkillUnavailable(
-                self.name,
+                self.skill_id,
                 "no packaged runtime; read SKILL.md and use low-level tools instead",
             )
         timeout = int(os.environ.get("SKILL_SCRIPT_TIMEOUT", "30"))
@@ -277,6 +424,9 @@ class SkillPack:
     def to_dict(self) -> dict[str, str | list[str]]:
         return {
             "name": self.name,
+            "skill_id": self.skill_id,
+            "display_name": self.display_name,
+            "aliases": self.aliases,
             "description": self.description,
             "when_to_use": self.when_to_use,
             "pack_dir": str(self.pack_dir),
@@ -387,9 +537,11 @@ def _parse_skill_markdown(path: Path) -> dict[str, Any]:
     frontmatter, body = _split_frontmatter(text)
     lines = body.splitlines()
     name = _clean_scalar(frontmatter.get("name", ""))
+    skill_id = _clean_scalar(frontmatter.get("skill_id", ""))
     description = _clean_scalar(frontmatter.get("description", ""))
     when_to_use = _extract_when_to_use(lines)
     command = _coerce_command(frontmatter.get("command"))
+    aliases = _coerce_aliases(frontmatter.get("aliases"))
     invocation = _clean_scalar(frontmatter.get("invocation", ""))
 
     if not name or not description:
@@ -405,6 +557,8 @@ def _parse_skill_markdown(path: Path) -> dict[str, Any]:
 
     return {
         "name": name,
+        "skill_id": skill_id,
+        "aliases": aliases,
         "description": description,
         "when_to_use": when_to_use,
         "command": command,
@@ -465,6 +619,44 @@ def _coerce_command(value: Any) -> list[str]:
     if isinstance(value, str) and value.strip():
         return shlex.split(value)
     return []
+
+
+def _coerce_aliases(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        return [raw]
+    return []
+
+
+def _resolve_skill_id(parsed: dict[str, Any], display_name: str) -> str:
+    explicit = str(parsed.get("skill_id", "")).strip()
+    if explicit:
+        return normalize_skill_key(explicit)
+    return normalize_skill_key(display_name)
+
+
+def _build_skill_aliases(
+    *,
+    display_name: str,
+    skill_id: str,
+    explicit_aliases: Any,
+) -> list[str]:
+    base_aliases = _coerce_aliases(explicit_aliases)
+    generated = [
+        display_name,
+        skill_id,
+        skill_id.replace("-", "_"),
+    ]
+    aliases: list[str] = []
+    for item in [*base_aliases, *generated]:
+        alias = str(item).strip()
+        if alias and alias not in aliases:
+            aliases.append(alias)
+    return aliases
 
 
 def _parse_legacy_body(lines: list[str], path: Path) -> dict[str, Any]:

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN="${PYTHON_BIN:-/home/wqqqq/miniconda3/envs/wind_agent/bin/python}"
+PYTHON_BIN="${PYTHON_BIN:-/home/w/miniconda3/envs/wind_agent/bin/python}"
 MODE="${1:-web}"
 
 if [[ "$MODE" == "-h" || "$MODE" == "--help" ]]; then

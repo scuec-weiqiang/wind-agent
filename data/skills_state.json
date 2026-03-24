@@ -2,7 +2,8 @@
   "enabled": {
     "baidu-search": true,
     "echo": false,
-    "email-mail-master 万能邮箱助手": true,
+    "email-mail-master": true,
+    "fft-frequency": true,
     "shell": true,
     "time": true,
     "weather": true

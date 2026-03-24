@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 import uuid
@@ -22,7 +23,14 @@ from app.chat import (
     _extract_reasoning_text,
     normalize_thinking_mode,
 )
-from app.skill_manager import SkillDisabled, SkillManager, SkillRegistryError, SkillUnavailable
+from app.skill_manager import (
+    SkillAmbiguousError,
+    SkillDisabled,
+    SkillManager,
+    SkillNotFoundError,
+    SkillRegistryError,
+    SkillUnavailable,
+)
 
 MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", DEFAULT_PROVIDER).strip().lower()
 MODEL_NAME = os.environ.get("MODEL_NAME", os.environ.get("OLLAMA_MODEL", DEFAULT_MODEL))
@@ -41,31 +49,35 @@ SKILL_ROUTER_PROMPT_TEMPLATE = (
     "Treat it as an available_skills index, not as full skill instructions.\n"
     "Below is the available tool catalog.\n"
     "Treat it as the low-level action reference.\n"
-    "Use the skill name exactly as listed if you choose one.\n"
+    "Use the skill_id exactly as listed if you choose one.\n"
     "Return JSON only, one of:\n"
     '{"action":"none"}\n'
-    '{"action":"read_skill","skill":"<name>"}\n'
+    '{"action":"read_skill","skill":"<skill_id>"}\n'
     '{"action":"list_dir","path":"<relative directory path>"}\n'
     '{"action":"read_file","path":"<relative file path>"}\n'
     '{"action":"search_text","pattern":"<text or regex>","path":"<relative path optional>"}\n'
+    '{"action":"list_uploaded_files"}\n'
+    '{"action":"read_uploaded_file","file_id":"<uploaded file id>"}\n'
     '{"action":"exec_command","command":"<shell command>"}\n'
     '{"action":"tool_calls","calls":[{"tool":"read_file","path":"README.md"},{"tool":"exec_command","command":"pwd"}]}\n'
-    '{"action":"use_skill","skill":"<name>","input":"<input for skill>"}\n'
-    '{"action":"use_skill","skill":"<name>","input":{"key":"value"}}\n'
-    '{"action":"use_skills","calls":[{"skill":"<name>","input":"..."},{"skill":"<name>","input":"..."}]}\n'
-    '{"action":"use_skills","calls":[{"skill":"<name>","input":{"key":"value"}}]}\n'
+    '{"action":"use_skill","skill":"<skill_id>","input":"<input for skill>"}\n'
+    '{"action":"use_skill","skill":"<skill_id>","input":{"key":"value"}}\n'
+    '{"action":"use_skills","calls":[{"skill":"<skill_id>","input":"..."},{"skill":"<skill_id>","input":"..."}]}\n'
+    '{"action":"use_skills","calls":[{"skill":"<skill_id>","input":{"key":"value"}}]}\n'
     "Rules:\n"
     "- no markdown, no prose, JSON only.\n"
     "- if no skill fits, return action=none.\n"
+    "- if one packaged_runtime skill clearly matches the user goal, prefer action=use_skill directly.\n"
     "- choose read_skill when the user is asking about what a skill does or how to use it.\n"
     "- if a skill is marked invocation=manual_only, do not return use_skill for it; return read_skill first.\n"
-    "- use list_dir to inspect folders before picking files.\n"
-    "- use read_file when you need file contents before deciding.\n"
-    "- use search_text when you need to find matching text in project files.\n"
+    "- do not use list_dir/read_file/search_text for routine tasks when a suitable packaged_runtime skill already exists.\n"
+    "- use list_dir/read_file/search_text only when required to disambiguate, inspect unknown files, or follow manual_only skills.\n"
     "- use exec_command when a shell command is the most direct way to answer.\n"
+    "- if user asks to use uploaded files, prefer list_uploaded_files/read_uploaded_file before other actions.\n"
     "- use tool_calls when the task needs multiple low-level steps.\n"
     "- input may be a string or a JSON object.\n"
     "- prefer using description and when_to_use to decide if a skill fits.\n"
+    "- if user asks to analyze vibration/frequency data and provides a directory path, prefer fft-frequency via use_skill.\n"
     "- for shell skill input, output executable command text only.\n"
     "- at most 3 calls for use_skills.\n\n"
     "Skill catalog:\n"
@@ -84,6 +96,42 @@ SESSIONS_DIR = Path(
         str(PROJECT_ROOT / "data" / "sessions"),
     )
 )
+UPLOADS_DIR = Path(
+    os.environ.get("WEB_UPLOADS_DIR", str(SESSIONS_DIR / "uploads"))
+)
+TEXT_FILE_EXTENSIONS = {
+    ".txt",
+    ".md",
+    ".csv",
+    ".json",
+    ".log",
+    ".yaml",
+    ".yml",
+    ".ini",
+    ".cfg",
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".java",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".go",
+    ".rs",
+    ".sh",
+    ".sql",
+    ".xml",
+    ".html",
+    ".css",
+}
+MAX_UPLOAD_SIZE_BYTES = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(2 * 1024 * 1024)))
+MAX_ATTACH_FILES = int(os.environ.get("MAX_ATTACH_FILES", "8"))
+MAX_ATTACH_CHARS_PER_FILE = int(os.environ.get("MAX_ATTACH_CHARS_PER_FILE", "12000"))
+MAX_ATTACH_TOTAL_CHARS = int(os.environ.get("MAX_ATTACH_TOTAL_CHARS", "36000"))
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 skill_manager: SkillManager | None = None
@@ -100,9 +148,36 @@ class ConversationState:
     created_at: float
     updated_at: float
     debug_trace: list[dict[str, object]] = field(default_factory=list)
+    attached_file_ids: list[str] = field(default_factory=list)
 
 
 _sessions: dict[str, ConversationState] = {}
+
+
+def _migrate_legacy_uploads() -> None:
+    # Keep backward compatibility for existing deployments that used data/uploads.
+    if "WEB_UPLOADS_DIR" in os.environ:
+        return
+    legacy_dir = PROJECT_ROOT / "data" / "uploads"
+    if not legacy_dir.exists() or not legacy_dir.is_dir():
+        return
+    if legacy_dir.resolve() == UPLOADS_DIR.resolve():
+        return
+
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    for item in legacy_dir.iterdir():
+        target = UPLOADS_DIR / item.name
+        if target.exists():
+            continue
+        try:
+            shutil.move(str(item), str(target))
+        except Exception:
+            continue
+
+    try:
+        legacy_dir.rmdir()
+    except OSError:
+        pass
 
 
 def _safe_session_filename(session_id: str) -> str:
@@ -140,6 +215,7 @@ def _save_session(session_id: str, state: ConversationState) -> None:
         "updated_at": state.updated_at,
         "assistant_messages": state.assistant.messages,
         "debug_trace": state.debug_trace[-200:],
+        "attached_file_ids": state.attached_file_ids[-MAX_ATTACH_FILES:],
     }
     tmp_path = path.with_suffix(".json.tmp")
     with open(tmp_path, "w", encoding="utf-8") as fh:
@@ -173,6 +249,13 @@ def _load_sessions_from_disk() -> None:
         debug_trace = payload.get("debug_trace")
         if isinstance(debug_trace, list):
             state.debug_trace = [item for item in debug_trace if isinstance(item, dict)][-200:]
+        attached_file_ids = payload.get("attached_file_ids")
+        if isinstance(attached_file_ids, list):
+            state.attached_file_ids = [
+                str(item).strip()
+                for item in attached_file_ids
+                if str(item).strip()
+            ][:MAX_ATTACH_FILES]
 
         loaded.append((session_id, state))
 
@@ -201,6 +284,91 @@ def _extract_session_id() -> str:
     raw = payload.get("session_id", "") or request.args.get("session_id", "")
     session_id = str(raw).strip()
     return session_id or DEFAULT_SESSION_ID
+
+
+def _extract_session_id_from_form() -> str:
+    raw = request.form.get("session_id", "") or request.args.get("session_id", "")
+    session_id = str(raw).strip()
+    return session_id or DEFAULT_SESSION_ID
+
+
+def _safe_upload_name(name: str) -> str:
+    candidate = Path(name or "").name
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", candidate).strip("._")
+    return sanitized or f"upload_{uuid.uuid4().hex[:8]}.csv"
+
+
+def _session_upload_dir(session_id: str) -> Path:
+    return UPLOADS_DIR / _safe_session_filename(session_id).replace(".json", "")
+
+
+def _safe_uploaded_path(session_id: str, file_id: str) -> Path | None:
+    base = _session_upload_dir(session_id).resolve()
+    candidate = (base / str(file_id or "").strip()).resolve()
+    try:
+        candidate.relative_to(base)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _is_text_upload(name: str) -> bool:
+    suffix = Path(name or "").suffix.lower()
+    return suffix in TEXT_FILE_EXTENSIONS
+
+
+def _read_text_file_with_fallback(path: Path) -> str:
+    for encoding in ("utf-8", "utf-8-sig", "gbk"):
+        try:
+            return path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    raise RuntimeError(f"Unsupported text encoding: {path}")
+
+
+def _list_uploaded_files_content(session_id: str, file_ids: list[str]) -> str:
+    if not file_ids:
+        return "(none)"
+    lines: list[str] = []
+    for file_id in file_ids[:MAX_ATTACH_FILES]:
+        path = _safe_uploaded_path(session_id, file_id)
+        if path is None or not path.exists() or not path.is_file():
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        lines.append(f"{file_id} ({size} bytes)")
+    return "\n".join(lines) if lines else "(none)"
+
+
+def _read_uploaded_file_content(session_id: str, file_id: str) -> str:
+    path = _safe_uploaded_path(session_id, file_id)
+    if path is None:
+        return "读取失败：附件路径无效。"
+    if not path.exists() or not path.is_file():
+        return f"读取失败：附件不存在：{file_id}"
+    try:
+        content = _read_text_file_with_fallback(path)
+    except Exception as exc:
+        return f"读取失败：{exc}"
+    if len(content) > MAX_ATTACH_CHARS_PER_FILE:
+        remain = len(content) - MAX_ATTACH_CHARS_PER_FILE
+        return content[:MAX_ATTACH_CHARS_PER_FILE] + f"\n\n... ({remain} more chars)"
+    return content
+
+
+def _build_attachment_manifest(session_id: str, attachment_ids: list[str]) -> str:
+    listing = _list_uploaded_files_content(session_id, attachment_ids)
+    if listing == "(none)":
+        return ""
+    return (
+        "User uploaded files are available in local storage.\n"
+        "Use list_uploaded_files/read_uploaded_file tools to inspect on demand.\n"
+        "<uploaded_files>\n"
+        f"{listing}\n"
+        "</uploaded_files>"
+    )
 
 
 def _extract_thinking_mode() -> str:
@@ -258,6 +426,21 @@ def _delete_session(session_id: str) -> bool:
         except OSError:
             pass
         removed = True
+    upload_dir = _session_upload_dir(session_id)
+    if upload_dir.exists() and upload_dir.is_dir():
+        for child in sorted(upload_dir.rglob("*"), reverse=True):
+            try:
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                elif child.is_dir():
+                    child.rmdir()
+            except OSError:
+                continue
+        try:
+            upload_dir.rmdir()
+        except OSError:
+            pass
+        removed = True
     return removed
 
 
@@ -285,6 +468,23 @@ def _extract_explicit_command(user_input: str) -> str | None:
             return cmd or None
 
     return None
+
+
+def _should_autorun_fft_for_uploads(user_input: str, state: ConversationState) -> bool:
+    text = (user_input or "").strip().lower()
+    if not text:
+        return False
+    if not state.attached_file_ids:
+        return False
+    has_analyze_intent = any(keyword in text for keyword in ("分析", "analy", "fft", "频率", "振动"))
+    if not has_analyze_intent:
+        return False
+    data_file_count = sum(
+        1
+        for file_id in state.attached_file_ids
+        if str(file_id).lower().endswith((".csv", ".txt"))
+    )
+    return data_file_count > 0
 
 
 def _format_shell_result(result: str) -> str:
@@ -476,13 +676,15 @@ def _plan_system_commands(session_id: str, state: ConversationState, user_input:
         return None
 
     router_prompt = _build_router_prompt()
+    attachment_manifest = _build_attachment_manifest(session_id, state.attached_file_ids)
+    extra_context = f"\n\n{attachment_manifest}\n" if attachment_manifest else ""
     return _request_router_decision(
         [
             {"role": "system", "content": router_prompt},
             {
                 "role": "user",
                 "content": (
-                    f"User request:\n{user_input}\n\n"
+                    f"User request:\n{user_input}{extra_context}\n\n"
                     f"Project root: {PROJECT_ROOT}\n"
                     "Only return JSON."
                 ),
@@ -559,6 +761,12 @@ def _available_tool_catalog() -> str:
             "- name: search_text",
             "  description: Search project files using ripgrep-style text matching.",
             "  parameters: { pattern: string, path?: string }",
+            "- name: list_uploaded_files",
+            "  description: List uploaded files currently attached to this session.",
+            "  parameters: {}",
+            "- name: read_uploaded_file",
+            "  description: Read one uploaded text file by file_id.",
+            "  parameters: { file_id: string }",
             "- name: exec_command",
             "  description: Run a shell command in the project workspace.",
             "  parameters: { command: string }",
@@ -599,17 +807,14 @@ def _plan_with_skill_doc(session_id: str, state: ConversationState, user_input: 
                     f"You have selected the skill '{skill_name}'.\n"
                     "Below is the full SKILL.md content. Follow it as the skill manual "
                     "when deciding the final action.\n"
-                    "At this stage, prefer low-level tool actions such as read_file, "
-                    "list_dir, search_text, and exec_command.\n"
-                    "If the task involves more than one step, prefer returning action=tool_calls "
-                    "with an ordered sequence of low-level tool actions.\n"
-                    "Use a single low-level action only when one step is enough.\n"
-                    "Only use use_skill if the skill truly needs its own dedicated runtime "
-                    "wrapper or if the manual clearly implies a single packaged entrypoint.\n"
                     f"This skill invocation mode is: {'packaged_runtime' if skill.has_runtime else 'manual_only'}.\n"
+                    "If invocation mode is packaged_runtime and user asks to execute/analyze with this skill, "
+                    "prefer action=use_skill with the user request as input.\n"
                     "If the skill is manual_only, do not return use_skill.\n"
-                    "If the SKILL.md shows concrete commands, prefer converting them into "
-                    "exec_command instead of falling back to use_skill.\n"
+                    "For manual_only skills, prefer low-level tool actions such as read_file, "
+                    "list_dir, search_text, and exec_command.\n"
+                    "If a manual_only task involves more than one step, prefer action=tool_calls "
+                    "with an ordered sequence of low-level actions.\n"
                     "If the manual suggests exploring files or reading config before execution, "
                     "model that explicitly with tool_calls.\n\n"
                     f"<skill_doc name=\"{skill_name}\">\n{skill_doc}\n</skill_doc>"
@@ -752,6 +957,21 @@ def _run_single_tool_action(session_id: str, state: ConversationState, decision:
         _trace_event(session_id, state, "tool_action_end", action=action, result=result[:1200])
         return result
 
+    if action == "list_uploaded_files":
+        content = _list_uploaded_files_content(session_id, state.attached_file_ids)
+        result = f"[list_uploaded_files]\n\n{content}"
+        _trace_event(session_id, state, "tool_action_end", action=action, result=result[:1200])
+        return result
+
+    if action == "read_uploaded_file":
+        file_id = str(decision.get("file_id", "")).strip()
+        if not file_id:
+            return "读取失败：缺少 file_id。"
+        content = _read_uploaded_file_content(session_id, file_id)
+        result = f"[read_uploaded_file] {file_id}\n\n{content}"
+        _trace_event(session_id, state, "tool_action_end", action=action, result=result[:1200])
+        return result
+
     if action == "exec_command":
         command = str(decision.get("command", "")).strip()
         if not command:
@@ -784,11 +1004,55 @@ def _run_single_tool_action(session_id: str, state: ConversationState, decision:
         skill_name = str(decision.get("skill", "")).strip()
         skill_input = decision.get("input", "")
         if not skill_name:
-            return None
+            payload = {
+                "code": "SKILL_NOT_FOUND",
+                "message": "No skill provided.",
+                "requested_name": skill_name,
+                "candidates": [],
+            }
+            return json.dumps(payload, ensure_ascii=False)
         try:
-            result = skill_manager.execute(skill_name, skill_input)
-        except Exception:
-            return None
+            result = skill_manager.execute(
+                skill_name,
+                skill_input,
+                session=state.assistant,
+            )
+        except SkillNotFoundError as exc:
+            payload = {
+                "code": "SKILL_NOT_FOUND",
+                "message": str(exc),
+                "requested_name": exc.requested_name,
+                "candidates": exc.candidates,
+            }
+            _trace_event(session_id, state, "tool_action_error", action=action, error=payload)
+            return json.dumps(payload, ensure_ascii=False)
+        except SkillAmbiguousError as exc:
+            payload = {
+                "code": "SKILL_AMBIGUOUS",
+                "message": str(exc),
+                "requested_name": exc.requested_name,
+                "candidates": exc.candidates,
+            }
+            _trace_event(session_id, state, "tool_action_error", action=action, error=payload)
+            return json.dumps(payload, ensure_ascii=False)
+        except SkillRegistryError as exc:
+            payload = {
+                "code": "SKILL_EXECUTION_FAILED",
+                "message": str(exc),
+                "requested_name": skill_name,
+                "candidates": [],
+            }
+            _trace_event(session_id, state, "tool_action_error", action=action, error=payload)
+            return json.dumps(payload, ensure_ascii=False)
+        except Exception as exc:
+            payload = {
+                "code": "SKILL_EXECUTION_FAILED",
+                "message": str(exc),
+                "requested_name": skill_name,
+                "candidates": [],
+            }
+            _trace_event(session_id, state, "tool_action_error", action=action, error=payload)
+            return json.dumps(payload, ensure_ascii=False)
         _trace_event(session_id, state, "tool_action_end", action=action, skill=skill_name, input=skill_input, result=result[:1200])
         return result
 
@@ -808,9 +1072,35 @@ def _run_single_tool_action(session_id: str, state: ConversationState, decision:
             if not skill_name:
                 continue
             try:
-                result = skill_manager.execute(skill_name, skill_input)
-            except Exception:
-                result = f"Skill '{skill_name}' execution failed."
+                result = skill_manager.execute(
+                    skill_name,
+                    skill_input,
+                    session=state.assistant,
+                )
+            except SkillNotFoundError as exc:
+                payload = {
+                    "code": "SKILL_NOT_FOUND",
+                    "message": str(exc),
+                    "requested_name": exc.requested_name,
+                    "candidates": exc.candidates,
+                }
+                result = json.dumps(payload, ensure_ascii=False)
+            except SkillAmbiguousError as exc:
+                payload = {
+                    "code": "SKILL_AMBIGUOUS",
+                    "message": str(exc),
+                    "requested_name": exc.requested_name,
+                    "candidates": exc.candidates,
+                }
+                result = json.dumps(payload, ensure_ascii=False)
+            except Exception as exc:
+                payload = {
+                    "code": "SKILL_EXECUTION_FAILED",
+                    "message": str(exc),
+                    "requested_name": skill_name,
+                    "candidates": [],
+                }
+                result = json.dumps(payload, ensure_ascii=False)
             outputs.append(f"步骤{i}: [{skill_name}] {result}")
         final = "\n\n".join(outputs) if outputs else None
         if final:
@@ -856,17 +1146,48 @@ def _run_single_tool_action(session_id: str, state: ConversationState, decision:
     return None
 
 
-def _try_system_response(session_id: str, state: ConversationState, user_input: str) -> str | None:
-    _trace_event(session_id, state, "user_request", input=user_input)
+def _try_system_response(
+    session_id: str,
+    state: ConversationState,
+    user_input: str,
+    display_user_input: str | None = None,
+) -> str | None:
+    shown_input = display_user_input if display_user_input is not None else user_input
+    _trace_event(session_id, state, "user_request", input=shown_input)
     explicit_command = _extract_explicit_command(user_input)
     if explicit_command:
         result = _run_system_command(explicit_command)
         message = _format_shell_result(result)
         _trace_event(session_id, state, "explicit_command", command=explicit_command, result=message[:1200])
-        state.assistant.add_user_message(user_input)
+        state.assistant.add_user_message(shown_input)
         state.assistant.add_assistant_message(message)
         _touch_session(session_id, state)
         return message
+
+    if _should_autorun_fft_for_uploads(shown_input, state) and skill_manager is not None:
+        upload_dir = _session_upload_dir(session_id)
+        try:
+            fft_result = skill_manager.execute(
+                "fft-frequency",
+                {
+                    "path": str(upload_dir),
+                    "files": state.attached_file_ids,
+                },
+                session=state.assistant,
+            )
+            _trace_event(
+                session_id,
+                state,
+                "autorun_fft",
+                upload_dir=str(upload_dir),
+                attached_files=state.attached_file_ids,
+            )
+            state.assistant.add_user_message(shown_input)
+            state.assistant.add_assistant_message(fft_result)
+            _touch_session(session_id, state)
+            return fft_result
+        except Exception as exc:
+            _trace_event(session_id, state, "autorun_fft_error", error=str(exc))
 
     decision = _plan_system_commands(session_id, state, user_input)
     if not decision:
@@ -894,14 +1215,22 @@ def _try_system_response(session_id: str, state: ConversationState, user_input: 
     planned = _run_planned_commands(session_id, state, decision)
     if not planned:
         return None
-    state.assistant.add_user_message(user_input)
+    state.assistant.add_user_message(shown_input)
     state.assistant.add_assistant_message(planned)
     _touch_session(session_id, state)
     return planned
 
 
-def _stream_chat(session_id: str, state: ConversationState, user_input: str) -> Response:
+def _stream_chat(
+    session_id: str,
+    state: ConversationState,
+    user_input: str,
+    model_input: str | None = None,
+) -> Response:
     state.assistant.add_user_message(user_input)
+    effective_input = model_input if model_input is not None else user_input
+    if state.assistant.messages:
+        state.assistant.messages[-1]["content"] = effective_input
     _touch_session(session_id, state)
 
     def generate():
@@ -975,6 +1304,8 @@ def _stream_chat(session_id: str, state: ConversationState, user_input: str) -> 
             reply = f"[network error] {exc}"
             yield f"event: error\ndata: {json.dumps({'text': reply}, ensure_ascii=False)}\n\n"
         finally:
+            if state.assistant.messages and state.assistant.messages[-1].get("role") == "user":
+                state.assistant.messages[-1]["content"] = user_input
             if thinking:
                 state.assistant.messages.append(
                     {"role": "assistant", "content": reply, "thinking": thinking}
@@ -995,6 +1326,7 @@ def _stream_chat(session_id: str, state: ConversationState, user_input: str) -> 
     )
 
 
+_migrate_legacy_uploads()
 _load_sessions_from_disk()
 
 
@@ -1004,12 +1336,41 @@ def chat():
     user_input = str(payload.get("message", "")).strip()
     if not user_input:
         return Response("No message provided.", status=400)
+    raw_attachment_ids = payload.get("attachment_ids", [])
+    attachment_ids = [
+        str(item).strip()
+        for item in (raw_attachment_ids if isinstance(raw_attachment_ids, list) else [])
+        if str(item).strip()
+    ]
 
     session_id = _extract_session_id()
     state = _ensure_session(session_id)
     state.assistant.thinking_mode = _extract_thinking_mode()
+    if attachment_ids:
+        unique_ids: list[str] = []
+        seen: set[str] = set()
+        for file_id in [*state.attached_file_ids, *attachment_ids]:
+            if file_id in seen:
+                continue
+            seen.add(file_id)
+            unique_ids.append(file_id)
+        state.attached_file_ids = unique_ids[:MAX_ATTACH_FILES]
+        _trace_event(
+            session_id,
+            state,
+            "attachments_bound",
+            attachment_count=len(state.attached_file_ids),
+            files=state.attached_file_ids,
+        )
+        _touch_session(session_id, state)
+    model_input = user_input
 
-    system_message = _try_system_response(session_id, state, user_input)
+    system_message = _try_system_response(
+        session_id,
+        state,
+        model_input,
+        display_user_input=user_input,
+    )
     if system_message is not None:
         def system_generate():
             yield f"event: answer\ndata: {json.dumps({'text': system_message}, ensure_ascii=False)}\n\n"
@@ -1025,7 +1386,7 @@ def chat():
             },
         )
 
-    return _stream_chat(session_id, state, user_input)
+    return _stream_chat(session_id, state, user_input, model_input=model_input)
 
 
 @app.route("/session/new", methods=["POST"])
@@ -1044,6 +1405,71 @@ def delete_session():
     session_id = _extract_session_id()
     deleted = _delete_session(session_id)
     return {"session_id": session_id, "deleted": deleted}
+
+
+@app.route("/upload", methods=["POST"])
+def upload_files():
+    session_id = _extract_session_id_from_form()
+    _ensure_session(session_id)
+
+    files = request.files.getlist("files")
+    if not files:
+        return {"ok": False, "error": "No files uploaded."}, 400
+
+    upload_dir = _session_upload_dir(session_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files: list[dict[str, object]] = []
+    rejected_files: list[str] = []
+    for file_item in files:
+        original_name = str(getattr(file_item, "filename", "") or "").strip()
+        if not original_name:
+            continue
+        file_item.stream.seek(0, os.SEEK_END)
+        size = int(file_item.stream.tell() or 0)
+        file_item.stream.seek(0)
+        if size > MAX_UPLOAD_SIZE_BYTES:
+            rejected_files.append(original_name)
+            continue
+        safe_name = _safe_upload_name(original_name)
+        if not _is_text_upload(safe_name):
+            rejected_files.append(original_name)
+            continue
+        target = upload_dir / safe_name
+        file_item.save(target)
+        saved_files.append(
+            {
+                "file_id": safe_name,
+                "name": original_name,
+                "saved_path": str(target),
+                "size": size,
+            }
+        )
+
+    if not saved_files:
+        return {
+            "ok": False,
+            "error": "No valid text files uploaded.",
+            "rejected_files": rejected_files,
+        }, 400
+
+    state = _ensure_session(session_id)
+    latest_ids = [
+        str(item.get("file_id", "")).strip()
+        for item in saved_files
+        if str(item.get("file_id", "")).strip()
+    ]
+    state.attached_file_ids = latest_ids[:MAX_ATTACH_FILES]
+    _touch_session(session_id, state)
+
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "upload_dir": str(upload_dir),
+        "saved_files": saved_files,
+        "rejected_files": rejected_files,
+        "attachment_ids": state.attached_file_ids,
+    }
 
 
 @app.route("/sessions", methods=["GET"])
@@ -1203,6 +1629,23 @@ def session_trace():
     session_id = _extract_session_id()
     state = _ensure_session(session_id)
     return {"session_id": session_id, "trace": state.debug_trace[-200:]}
+
+
+@app.route("/session/attachments", methods=["GET"])
+def session_attachments():
+    session_id = _extract_session_id()
+    state = _ensure_session(session_id)
+    items: list[dict[str, object]] = []
+    for file_id in state.attached_file_ids:
+        path = _safe_uploaded_path(session_id, file_id)
+        if path is None or not path.exists() or not path.is_file():
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        items.append({"file_id": file_id, "size": size, "path": str(path)})
+    return {"session_id": session_id, "files": items}
 
 
 @app.route("/")
