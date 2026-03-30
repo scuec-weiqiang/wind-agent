@@ -115,19 +115,28 @@ def main() -> None:
 
     lines = _build_summary(summary)
     if args.session_id and svg_path.exists():
+        svg_version = int(svg_path.stat().st_mtime_ns)
         lines.append("")
         lines.append("功率曲线图：")
-        lines.append(f"![风电机组功率曲线](/session/file?session_id={args.session_id}&file_id={svg_path.name})")
+        lines.append(
+            f"![风电机组功率曲线](/session/file?session_id={args.session_id}&file_id={svg_path.name}&v={svg_version})"
+        )
     if args.session_id and report_path.exists():
+        report_version = int(report_path.stat().st_mtime_ns)
         lines.append("")
         lines.append("报告文件：")
-        lines.append(f"[查看 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name})")
-        lines.append(f"[下载 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name}&download=1)")
+        lines.append(
+            f"[查看 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name}&v={report_version})"
+        )
+        lines.append(
+            f"[下载 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name}&download=1&v={report_version})"
+        )
     lines.append("")
     lines.append(f"健康评估：`{assessment_csv}`")
     lines.append(f"散点明细：`{points_csv}`")
     lines.append(f"拟合曲线：`{fit_csv}`")
     lines.append(f"图像文件：`{svg_path}`")
+    lines.append(f"HTML 报告：`{report_path}`")
     print("\n".join(lines))
 
 

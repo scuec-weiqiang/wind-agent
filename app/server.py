@@ -78,6 +78,7 @@ SKILL_ROUTER_PROMPT_TEMPLATE = (
     "- input may be a string or a JSON object.\n"
     "- prefer using description and when_to_use to decide if a skill fits.\n"
     "- if user asks to analyze vibration/frequency data and provides a directory path, prefer fft-frequency via use_skill.\n"
+    "- if user asks to analyze power curve / 风速功率 / 发电健康 / 功率曲线 and provides csv data, prefer power-curve-assessment via use_skill.\n"
     "- for shell skill input, output executable command text only.\n"
     "- at most 3 calls for use_skills.\n\n"
     "Skill catalog:\n"
@@ -128,7 +129,18 @@ TEXT_FILE_EXTENSIONS = {
     ".html",
     ".css",
 }
-MAX_UPLOAD_SIZE_BYTES = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(2 * 1024 * 1024)))
+def _parse_max_upload_size_bytes() -> int | None:
+    raw = str(os.environ.get("MAX_UPLOAD_SIZE_BYTES", "")).strip().lower()
+    if not raw or raw in {"0", "none", "unlimited", "inf", "infinite", "-1"}:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return 50 * 1024 * 1024
+    return value if value > 0 else None
+
+
+MAX_UPLOAD_SIZE_BYTES = _parse_max_upload_size_bytes()
 MAX_ATTACH_CHARS_PER_FILE = int(os.environ.get("MAX_ATTACH_CHARS_PER_FILE", "12000"))
 MAX_ATTACH_TOTAL_CHARS = int(os.environ.get("MAX_ATTACH_TOTAL_CHARS", "36000"))
 
@@ -497,13 +509,46 @@ def _should_autorun_fft_for_uploads(user_input: str, state: ConversationState) -
         return False
     if not state.attached_file_ids:
         return False
-    has_analyze_intent = any(keyword in text for keyword in ("分析", "analy", "fft", "频率", "振动"))
-    if not has_analyze_intent:
+    fft_keywords = ("fft", "频率", "振动", "加速度", "塔架", "塔筒", "主频", "频谱")
+    power_curve_keywords = ("功率曲线", "power curve", "powercurve", "风速功率", "出力", "发电健康", "健康评分")
+    has_fft_intent = any(keyword in text for keyword in fft_keywords)
+    has_power_curve_intent = any(keyword in text for keyword in power_curve_keywords)
+    if not has_fft_intent or has_power_curve_intent:
         return False
     data_file_count = sum(
         1
         for file_id in state.attached_file_ids
         if str(file_id).lower().endswith((".csv", ".txt"))
+    )
+    return data_file_count > 0
+
+
+def _should_autorun_power_curve_for_uploads(user_input: str, state: ConversationState) -> bool:
+    text = (user_input or "").strip().lower()
+    if not text:
+        return False
+    if not state.attached_file_ids:
+        return False
+    has_analyze_intent = any(
+        keyword in text
+        for keyword in (
+            "分析",
+            "评估",
+            "功率曲线",
+            "power curve",
+            "powercurve",
+            "风速功率",
+            "出力",
+            "发电健康",
+            "健康评分",
+        )
+    )
+    if not has_analyze_intent:
+        return False
+    data_file_count = sum(
+        1
+        for file_id in state.attached_file_ids
+        if str(file_id).lower().endswith(".csv")
     )
     return data_file_count > 0
 
@@ -1185,6 +1230,31 @@ def _try_system_response(
         _touch_session(session_id, state)
         return message
 
+    if _should_autorun_power_curve_for_uploads(shown_input, state) and skill_manager is not None:
+        upload_dir = _session_upload_dir(session_id)
+        try:
+            power_curve_result = skill_manager.execute(
+                "power-curve-assessment",
+                {
+                    "path": str(upload_dir),
+                    "files": state.attached_file_ids,
+                },
+                session=state.assistant,
+            )
+            _trace_event(
+                session_id,
+                state,
+                "autorun_power_curve",
+                upload_dir=str(upload_dir),
+                attached_files=state.attached_file_ids,
+            )
+            state.assistant.add_user_message(shown_input)
+            state.assistant.add_assistant_message(power_curve_result)
+            _touch_session(session_id, state)
+            return power_curve_result
+        except Exception as exc:
+            _trace_event(session_id, state, "autorun_power_curve_error", error=str(exc))
+
     if _should_autorun_fft_for_uploads(shown_input, state) and skill_manager is not None:
         upload_dir = _session_upload_dir(session_id)
         try:
@@ -1449,7 +1519,7 @@ def upload_files():
         file_item.stream.seek(0, os.SEEK_END)
         size = int(file_item.stream.tell() or 0)
         file_item.stream.seek(0)
-        if size > MAX_UPLOAD_SIZE_BYTES:
+        if MAX_UPLOAD_SIZE_BYTES is not None and size > MAX_UPLOAD_SIZE_BYTES:
             rejected_files.append(original_name)
             continue
         safe_name = _safe_upload_name(original_name)
@@ -1679,7 +1749,11 @@ def session_file():
     path = _safe_uploaded_path(session_id, file_id)
     if path is None or not path.exists() or not path.is_file():
         return {"ok": False, "error": "File not found."}, 404
-    return send_from_directory(str(path.parent), path.name, as_attachment=download)
+    response = send_from_directory(str(path.parent), path.name, as_attachment=download, max_age=0)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/")

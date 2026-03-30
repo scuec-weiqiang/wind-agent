@@ -26,13 +26,15 @@ BIN_WIDTH = 0.1
 REPORT_SVG_POINT_LIMIT = 6000
 MAX_VALID_WIND_SPEED = 20.0
 MIN_BIN_SAMPLES = 8
-NEAR_CURVE_RATIO = 0.20
 LOW_BAND_QUANTILE = 0.15
 HIGH_BAND_QUANTILE = 0.85
 LOW_POWER_FLOOR_KW = 80.0
 HIGH_POWER_FLOOR_KW = 120.0
 STOP_PITCH_DEG = 80.0
 STOP_POWER_KW = 50.0
+SLIDE_MIN_PREFIX = 6
+SLIDE_JUMP_RATIO = 1.35
+SLIDE_MEDIAN_GAIN_RATIO = 0.10
 
 
 @dataclass
@@ -181,15 +183,48 @@ def _quantile(values: Sequence[float], q: float) -> float:
 def _remove_bin_outliers(values: Sequence[float]) -> list[float]:
     if len(values) < 4:
         return list(values)
-    q1 = _quantile(values, 0.25)
-    q3 = _quantile(values, 0.75)
+    descending = sorted(values, reverse=True)
+    prefix_stds: list[float] = [0.0]
+    prefix_sum = 0.0
+    prefix_sum_sq = 0.0
+    for index, value in enumerate(descending, start=1):
+        prefix_sum += value
+        prefix_sum_sq += value * value
+        if index == 1:
+            continue
+        subset_mean = prefix_sum / index
+        variance = max(0.0, prefix_sum_sq / index - subset_mean * subset_mean)
+        prefix_stds.append(math.sqrt(variance))
+
+    best_cut = len(descending)
+    best_jump = 0.0
+    for index in range(SLIDE_MIN_PREFIX, len(prefix_stds) - 1):
+        current_std = prefix_stds[index]
+        next_std = prefix_stds[index + 1]
+        if current_std <= 0.0:
+            continue
+        jump_ratio = next_std / current_std
+        if jump_ratio > SLIDE_JUMP_RATIO and jump_ratio > best_jump:
+            best_jump = jump_ratio
+            best_cut = index
+
+    slide_filtered = descending[:best_cut]
+    full_median = median(descending)
+    filtered_median = median(slide_filtered) if slide_filtered else full_median
+    if best_cut < len(descending) and filtered_median >= full_median * (1.0 + SLIDE_MEDIAN_GAIN_RATIO):
+        candidates = slide_filtered
+    else:
+        candidates = descending
+
+    q1 = _quantile(candidates, 0.25)
+    q3 = _quantile(candidates, 0.75)
     iqr = q3 - q1
     if math.isclose(iqr, 0.0):
-        return list(values)
+        return list(candidates)
     lower = q1 - 1.5 * iqr
     upper = q3 + 1.5 * iqr
-    filtered = [value for value in values if lower <= value <= upper]
-    return filtered or list(values)
+    filtered = [value for value in candidates if lower <= value <= upper]
+    return filtered or list(candidates)
 
 
 def _smooth_stats(stats: Sequence[BinStats]) -> list[BinStats]:
