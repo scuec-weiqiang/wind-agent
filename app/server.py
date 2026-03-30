@@ -129,9 +129,28 @@ TEXT_FILE_EXTENSIONS = {
     ".css",
 }
 MAX_UPLOAD_SIZE_BYTES = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(2 * 1024 * 1024)))
-MAX_ATTACH_FILES = int(os.environ.get("MAX_ATTACH_FILES", "8"))
 MAX_ATTACH_CHARS_PER_FILE = int(os.environ.get("MAX_ATTACH_CHARS_PER_FILE", "12000"))
 MAX_ATTACH_TOTAL_CHARS = int(os.environ.get("MAX_ATTACH_TOTAL_CHARS", "36000"))
+
+
+def _parse_max_attach_files() -> int | None:
+    raw = str(os.environ.get("MAX_ATTACH_FILES", "")).strip().lower()
+    if not raw or raw in {"0", "none", "unlimited", "inf", "infinite", "-1"}:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+MAX_ATTACH_FILES = _parse_max_attach_files()
+
+
+def _limit_attachment_ids(file_ids: list[str]) -> list[str]:
+    if MAX_ATTACH_FILES is None:
+        return list(file_ids)
+    return list(file_ids[:MAX_ATTACH_FILES])
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 skill_manager: SkillManager | None = None
@@ -215,7 +234,7 @@ def _save_session(session_id: str, state: ConversationState) -> None:
         "updated_at": state.updated_at,
         "assistant_messages": state.assistant.messages,
         "debug_trace": state.debug_trace[-200:],
-        "attached_file_ids": state.attached_file_ids[-MAX_ATTACH_FILES:],
+        "attached_file_ids": _limit_attachment_ids(state.attached_file_ids),
     }
     tmp_path = path.with_suffix(".json.tmp")
     with open(tmp_path, "w", encoding="utf-8") as fh:
@@ -251,11 +270,11 @@ def _load_sessions_from_disk() -> None:
             state.debug_trace = [item for item in debug_trace if isinstance(item, dict)][-200:]
         attached_file_ids = payload.get("attached_file_ids")
         if isinstance(attached_file_ids, list):
-            state.attached_file_ids = [
+            state.attached_file_ids = _limit_attachment_ids([
                 str(item).strip()
                 for item in attached_file_ids
                 if str(item).strip()
-            ][:MAX_ATTACH_FILES]
+            ])
 
         loaded.append((session_id, state))
 
@@ -330,7 +349,7 @@ def _list_uploaded_files_content(session_id: str, file_ids: list[str]) -> str:
     if not file_ids:
         return "(none)"
     lines: list[str] = []
-    for file_id in file_ids[:MAX_ATTACH_FILES]:
+    for file_id in _limit_attachment_ids(file_ids):
         path = _safe_uploaded_path(session_id, file_id)
         if path is None or not path.exists() or not path.is_file():
             continue
@@ -1354,7 +1373,7 @@ def chat():
                 continue
             seen.add(file_id)
             unique_ids.append(file_id)
-        state.attached_file_ids = unique_ids[:MAX_ATTACH_FILES]
+        state.attached_file_ids = _limit_attachment_ids(unique_ids)
         _trace_event(
             session_id,
             state,
@@ -1459,7 +1478,7 @@ def upload_files():
         for item in saved_files
         if str(item.get("file_id", "")).strip()
     ]
-    state.attached_file_ids = latest_ids[:MAX_ATTACH_FILES]
+    state.attached_file_ids = _limit_attachment_ids(latest_ids)
     _touch_session(session_id, state)
 
     return {
@@ -1646,6 +1665,18 @@ def session_attachments():
             size = 0
         items.append({"file_id": file_id, "size": size, "path": str(path)})
     return {"session_id": session_id, "files": items}
+
+
+@app.route("/session/file", methods=["GET"])
+def session_file():
+    session_id = _extract_session_id()
+    file_id = str(request.args.get("file_id", "")).strip()
+    if not file_id:
+        return {"ok": False, "error": "Missing file_id."}, 400
+    path = _safe_uploaded_path(session_id, file_id)
+    if path is None or not path.exists() or not path.is_file():
+        return {"ok": False, "error": "File not found."}, 404
+    return send_from_directory(str(path.parent), path.name)
 
 
 @app.route("/")

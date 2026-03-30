@@ -605,6 +605,16 @@ body {
 .ai .bubble pre {
   margin: 0.4em 0 0.75em;
 }
+.ai .bubble img {
+  display: block;
+  width: min(100%, 760px);
+  height: auto;
+  margin: 0.5em 0;
+  border-radius: 14px;
+  border: 1px solid rgba(53, 98, 148, 0.16);
+  background: rgba(247, 251, 253, 0.95);
+  box-shadow: 0 8px 24px rgba(33, 83, 136, 0.08);
+}
 .think-box {
   width: fit-content;
   max-width: min(820px, 92%);
@@ -721,6 +731,11 @@ body {
   border: 1px solid rgba(53, 98, 148, 0.15);
   border-radius: 12px;
   padding: 8px 10px;
+  line-height: 1.5;
+  max-height: 3.8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .welcome-row {
   padding: 10px 10px 10px 16px;
@@ -983,7 +998,15 @@ function setWelcomeMode(enabled) {
 
 function renderAttachmentStatus() {
   const names = attachedFiles.map((item) => item.name || item.file_id);
-  const text = names.length
+  const previewLimit = 3;
+  let text = "";
+  if (names.length) {
+    const preview = names.slice(0, previewLimit);
+    const remain = names.length - preview.length;
+    const summary = remain > 0 ? `${preview.join("，")} 等 ${names.length} 个文件` : preview.join("，");
+    text = `已附加 ${names.length} 个文件：${summary}`;
+  }
+  const fullText = names.length
     ? `已附加 ${names.length} 个文件：${names.join("，")}`
     : "";
   [composerAttachmentStatus, welcomeAttachmentStatus].forEach((el) => {
@@ -991,9 +1014,11 @@ function renderAttachmentStatus() {
     if (!text) {
       el.classList.add("hidden");
       el.textContent = "";
+      el.removeAttribute("title");
       return;
     }
     el.textContent = text;
+    el.title = fullText;
     el.classList.remove("hidden");
   });
 }

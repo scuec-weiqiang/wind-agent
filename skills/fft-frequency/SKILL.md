@@ -29,3 +29,5 @@ aliases: ["fft", "tower-fft", "vibration-fft", "风机频率分析", "振动频�
 - 生成文件：
   - `tower_frequency_windows.csv`
   - `tower_frequency_assessment.csv`
+  - `frequency_trend.svg`
+  - `tower_frequency_report.html`

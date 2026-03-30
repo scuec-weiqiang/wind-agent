@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ report_title }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+    :root {
+      --ink: #1c2731;
+      --muted: #5d6b78;
+      --line: #a8b4be;
+      --panel: #eef3f5;
+      --accent: #0e6b74;
+      --warn: #b26a00;
+      --danger: #a12622;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+      background: white;
+    }
+    .report { width: 100%; }
+    .header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin: 0 0 8px 0;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+    .section { margin-top: 14px; }
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      padding: 6px 10px;
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+      margin-bottom: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 7px 8px;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #f7fafb;
+      font-weight: 700;
+      text-align: center;
+    }
+    td.label {
+      width: 18%;
+      background: #fafcfd;
+      font-weight: 700;
+    }
+    td.value { width: 32%; }
+    .status-normal { color: var(--accent); font-weight: 700; }
+    .status-watch { color: var(--warn); font-weight: 700; }
+    .status-alert { color: var(--danger); font-weight: 700; }
+    .note {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    .chart-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .chart-box img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="report">
+    <div class="header">
+      <h1 class="title">{{ report_title }}</h1>
+      <p class="subtitle">
+        风场：{{ site_name }}　
+        机组：{{ turbine_id }}　
+        报告时间：{{ generated_at }}
+      </p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">一、基础信息</div>
+      <table>
+        <tr>
+          <td class="label">数据范围</td>
+          <td class="value">{{ data_range }}</td>
+          <td class="label">参考固有频率</td>
+          <td class="value">{{ reference_frequency_hz }} Hz</td>
+        </tr>
+        <tr>
+          <td class="label">检测文件数</td>
+          <td class="value">{{ file_count }}</td>
+          <td class="label">检测结论</td>
+          <td class="value">{{ overall_conclusion }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">二、频率变化趋势</div>
+      <div class="chart-box">
+        {{ frequency_trend_svg }}
+      </div>
+      <div class="note">说明：曲线为识别频率变化趋势，图中仅突出二级预警点。</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">三、结果摘要</div>
+      <table>
+        <thead>
+          <tr>
+            <th>时刻</th>
+            <th>当前状态</th>
+            <th>识别频率</th>
+            <th>偏离程度</th>
+            <th>预警</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ assessment_rows_html }}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">四、异常机组关注项</div>
+      <table>
+        <thead>
+          <tr>
+            <th>机组/文件</th>
+            <th>代表时刻</th>
+            <th>主导频率</th>
+            <th>风险判断</th>
+            <th>建议措施</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ attention_rows_html }}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">五、窗口识别明细</div>
+      <table>
+        <thead>
+          <tr>
+            <th>文件</th>
+            <th>时刻</th>
+            <th>窗口中心秒</th>
+            <th>识别频率</th>
+            <th>置信度</th>
+            <th>方向</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ window_rows_html }}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      频率识别模块：FFT Skill 自动生成
+    </div>
+  </div>
+</body>
+</html>

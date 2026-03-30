@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import math
 import re
 import statistics
@@ -424,6 +425,167 @@ def write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[dict[str, ob
             writer.writerow(row)
 
 
+def write_text(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8")
+
+
+def _svg_polyline(
+    x_values: Sequence[float],
+    y_values: Sequence[float],
+    width: int,
+    height: int,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> str:
+    if not x_values or not y_values:
+        return ""
+    min_x, max_x = min(x_values), max(x_values)
+    min_y, max_y = min(y_values), max(y_values)
+    if math.isclose(min_x, max_x):
+        max_x = min_x + 1.0
+    if math.isclose(min_y, max_y):
+        pad = 0.1 if min_y == 0 else abs(min_y) * 0.05
+        min_y -= pad
+        max_y += pad
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+    points = []
+    for x_value, y_value in zip(x_values, y_values):
+        x_pos = left + (x_value - min_x) / (max_x - min_x) * plot_width
+        y_pos = top + plot_height - (y_value - min_y) / (max_y - min_y) * plot_height
+        points.append(f"{x_pos:.1f},{y_pos:.1f}")
+    return " ".join(points)
+
+
+def _svg_smooth_path(points: Sequence[tuple[float, float]]) -> str:
+    if not points:
+        return ""
+    if len(points) == 1:
+        x_value, y_value = points[0]
+        return f"M {x_value:.1f} {y_value:.1f}"
+    commands = [f"M {points[0][0]:.1f} {points[0][1]:.1f}"]
+    for index in range(len(points) - 1):
+        p0 = points[index - 1] if index > 0 else points[index]
+        p1 = points[index]
+        p2 = points[index + 1]
+        p3 = points[index + 2] if index + 2 < len(points) else p2
+        cp1_x = p1[0] + (p2[0] - p0[0]) / 6.0
+        cp1_y = p1[1] + (p2[1] - p0[1]) / 6.0
+        cp2_x = p2[0] - (p3[0] - p1[0]) / 6.0
+        cp2_y = p2[1] - (p3[1] - p1[1]) / 6.0
+        commands.append(
+            f"C {cp1_x:.1f} {cp1_y:.1f}, {cp2_x:.1f} {cp2_y:.1f}, {p2[0]:.1f} {p2[1]:.1f}"
+        )
+    return " ".join(commands)
+
+
+def build_frequency_trend_svg(
+    assessments: Sequence[FileAssessment],
+    reference_frequency: float,
+) -> str:
+    width, height = 960, 420
+    left, top, right, bottom = 72, 58, 28, 56
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+    timestamps = [item.representative_time or item.timestamp for item in assessments]
+    x_values = [item.timestamp() for item in timestamps]
+    y_values = [item.natural_frequency_hz for item in assessments]
+    min_y = min(y_values) if y_values else 0.0
+    max_y = max(y_values) if y_values else 1.0
+    if math.isclose(min_y, max_y):
+        min_y -= 0.1
+        max_y += 0.1
+    else:
+        pad = (max_y - min_y) * 0.12
+        min_y -= pad
+        max_y += pad
+
+    def scale_x(value: float) -> float:
+        min_x = min(x_values) if x_values else 0.0
+        max_x = max(x_values) if x_values else 1.0
+        if math.isclose(min_x, max_x):
+            max_x = min_x + 1.0
+        return left + (value - min_x) / (max_x - min_x) * plot_width
+
+    def scale_y(value: float) -> float:
+        return top + plot_height - (value - min_y) / (max_y - min_y) * plot_height
+
+    screen_points = [
+        (scale_x(x_value), scale_y(y_value))
+        for x_value, y_value in zip(x_values, y_values)
+    ]
+    smooth_path = _svg_smooth_path(screen_points)
+
+    y_ticks = []
+    y_tick_count = 3
+    for index in range(y_tick_count):
+        ratio = index / (y_tick_count - 1) if y_tick_count > 1 else 0.0
+        value = max_y - (max_y - min_y) * ratio
+        y_pos = top + plot_height * ratio
+        y_ticks.append(
+            f'<line x1="{left}" y1="{y_pos:.1f}" x2="{width - right}" y2="{y_pos:.1f}" '
+            f'stroke="#d9e3ea" stroke-width="1" />'
+            f'<text x="{left - 10}" y="{y_pos + 4:.1f}" text-anchor="end" '
+            f'font-size="12" fill="#597184">{value:.2f}</text>'
+        )
+
+    x_ticks = []
+    if timestamps:
+        min_dt = min(timestamps)
+        max_dt = max(timestamps)
+        hour_start = min_dt.replace(minute=0, second=0, microsecond=0)
+        hour_end = max_dt.replace(minute=0, second=0, microsecond=0)
+        total_hours = max(1, int((hour_end - hour_start).total_seconds() // 3600) + 1)
+        max_hour_labels = 8
+        hour_step = max(1, math.ceil(total_hours / max_hour_labels))
+        tick_time = hour_start
+        while tick_time <= hour_end:
+            x_pos = scale_x(tick_time.timestamp())
+            tick_label = tick_time.strftime("%H:00")
+            if min_dt.date() != max_dt.date():
+                tick_label = tick_time.strftime("%m-%d %H:00")
+            x_ticks.append(
+                f'<line x1="{x_pos:.1f}" y1="{top}" x2="{x_pos:.1f}" y2="{top + plot_height}" '
+                f'stroke="#eef3f7" stroke-width="1" />'
+                f'<text x="{x_pos:.1f}" y="{height - 24}" text-anchor="middle" '
+                f'font-size="11" fill="#597184">{html.escape(tick_label)}</text>'
+            )
+            tick_time += timedelta(hours=hour_step)
+
+    points = []
+    labels = []
+    for item, (x_pos, y_pos) in zip(assessments, screen_points):
+        if item.warning != "二级预警":
+            continue
+        points.append(
+            f'<circle cx="{x_pos:.1f}" cy="{y_pos:.1f}" r="5.5" fill="#a12622" stroke="#ffffff" stroke-width="2" />'
+        )
+        labels.append(
+            f'<text x="{x_pos:.1f}" y="{y_pos - 12:.1f}" text-anchor="middle" font-size="11" fill="#7f1d1d">'
+            f'{item.natural_frequency_hz:.4f}</text>'
+        )
+
+    ref_y = scale_y(reference_frequency)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="{left}" y="24" font-size="20" font-weight="700" fill="#1c2731">塔架频率随时间变化曲线</text>
+  <text x="{width - right}" y="24" text-anchor="end" font-size="12" fill="#5d6b78">参考固有频率: {reference_frequency:.4f} Hz</text>
+  <rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}" rx="10" fill="#f9fbfc" stroke="#d8e2e8"/>
+  {''.join(y_ticks)}
+  {''.join(x_ticks)}
+  <line x1="{left}" y1="{ref_y:.1f}" x2="{width - right}" y2="{ref_y:.1f}" stroke="#0e6b74" stroke-width="2" stroke-dasharray="6 5" />
+  <path d="{smooth_path}" fill="none" stroke="#2d6cdf" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  {''.join(points)}
+  {''.join(labels)}
+  <text x="{left + plot_width / 2:.1f}" y="{height - 8}" text-anchor="middle" font-size="12" fill="#597184">时间</text>
+  <text x="20" y="{top + plot_height / 2:.1f}" text-anchor="middle" font-size="12" fill="#597184" transform="rotate(-90 20 {top + plot_height / 2:.1f})">频率 (Hz)</text>
+</svg>
+"""
+    return svg
+
+
 def analyse_directory(
     base_dir: Path,
     include_files: Sequence[str] | None = None,
@@ -535,6 +697,10 @@ def analyse_directory(
             "有效窗口数",
         ],
         result_rows,
+    )
+    write_text(
+        base_dir / "frequency_trend.svg",
+        build_frequency_trend_svg(assessments, reference_frequency),
     )
     return assessments, reference_frequency
 

@@ -65,11 +65,15 @@ def _safe_session_dir_name(session_id: str) -> str:
 def _default_analysis_dir(session_id: str) -> Path:
     project_root = Path(__file__).resolve().parents[3]
     safe_session = _safe_session_dir_name(session_id)
-    upload_dir = project_root / "data" / "uploads" / safe_session
-    if upload_dir.exists() and upload_dir.is_dir():
-        has_candidates = any(upload_dir.glob("*.csv")) or any(upload_dir.glob("*.txt"))
-        if has_candidates:
-            return upload_dir.resolve()
+    upload_dirs = [
+        project_root / "data" / "sessions" / "uploads" / safe_session,
+        project_root / "data" / "uploads" / safe_session,
+    ]
+    for upload_dir in upload_dirs:
+        if upload_dir.exists() and upload_dir.is_dir():
+            has_candidates = any(upload_dir.glob("*.csv")) or any(upload_dir.glob("*.txt"))
+            if has_candidates:
+                return upload_dir.resolve()
     return project_root
 
 
@@ -86,6 +90,19 @@ def _load_fft_module(skill_scripts_dir: Path):
         raise RuntimeError("Failed to load fft.py module spec.")
     module = importlib.util.module_from_spec(spec)
     # Ensure decorators relying on sys.modules (e.g. dataclass) can resolve the module.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_report_module(skill_scripts_dir: Path):
+    report_path = skill_scripts_dir / "report.py"
+    if not report_path.exists():
+        raise FileNotFoundError(f"report.py not found: {report_path}")
+    spec = importlib.util.spec_from_file_location("wind_fft_report_module", report_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Failed to load report.py module spec.")
+    module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
@@ -122,6 +139,12 @@ def main() -> None:
         sys.exit(1)
 
     try:
+        report_module = _load_report_module(scripts_dir)
+    except Exception as exc:
+        print(f"FFT report failed: {exc}")
+        sys.exit(1)
+
+    try:
         assessments, reference_frequency = fft_module.analyse_directory(
             target_dir,
             include_files=include_files,
@@ -140,6 +163,28 @@ def main() -> None:
         )
     lines.append(f"输出文件: {target_dir / 'tower_frequency_windows.csv'}")
     lines.append(f"输出文件: {target_dir / 'tower_frequency_assessment.csv'}")
+
+    template_path = skill_dir / "report_template.html"
+    try:
+        report_path = report_module.generate_report(
+            target_dir,
+            reference_frequency,
+            template_path,
+        )
+        lines.append(f"输出文件: {report_path}")
+    except Exception as exc:
+        lines.append(f"HTML 报告生成失败: {exc}")
+
+    trend_svg = target_dir / "frequency_trend.svg"
+    if trend_svg.exists():
+        lines.append(f"输出文件: {trend_svg}")
+        if args.session_id:
+            lines.append("")
+            lines.append("频率随时间变化曲线：")
+            lines.append(f"![塔架频率随时间变化曲线](/session/file?session_id={args.session_id}&file_id=frequency_trend.svg)")
+            if 'report_path' in locals() and report_path.exists():
+                lines.append("")
+                lines.append(f"[查看 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name})")
     print("\n".join(lines))
 
 
