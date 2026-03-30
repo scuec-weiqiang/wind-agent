@@ -49,6 +49,7 @@ def _extract_reasoning_text(payload: Dict[str, Any], provider: str) -> str:
 
 @dataclass
 class ChatSession:
+    id: str = ""
     model: str = DEFAULT_MODEL
     base_url: str = DEFAULT_URL
     provider: str = DEFAULT_PROVIDER

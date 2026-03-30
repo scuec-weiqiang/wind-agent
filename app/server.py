@@ -208,10 +208,11 @@ def _session_file_path(session_id: str) -> Path:
     return SESSIONS_DIR / _safe_session_filename(session_id)
 
 
-def _new_conversation_state() -> ConversationState:
+def _new_conversation_state(session_id: str) -> ConversationState:
     now = time.time()
     return ConversationState(
         assistant=ChatSession(
+            id=session_id,
             model=MODEL_NAME,
             base_url=MODEL_BASE_URL,
             provider=MODEL_PROVIDER,
@@ -258,7 +259,7 @@ def _load_sessions_from_disk() -> None:
         if not session_id:
             continue
 
-        state = _new_conversation_state()
+        state = _new_conversation_state(session_id)
         state.created_at = float(payload.get("created_at", time.time()))
         state.updated_at = float(payload.get("updated_at", state.created_at))
 
@@ -286,13 +287,14 @@ def _load_sessions_from_disk() -> None:
 def _ensure_session(session_id: str) -> ConversationState:
     state = _sessions.get(session_id)
     if state is not None:
+        state.assistant.id = session_id
         return state
 
     if len(_sessions) >= MAX_SESSIONS:
         oldest = min(_sessions.items(), key=lambda item: item[1].updated_at)[0]
         _sessions.pop(oldest, None)
 
-    state = _new_conversation_state()
+    state = _new_conversation_state(session_id)
     _sessions[session_id] = state
     _save_session(session_id, state)
     return state
@@ -1671,12 +1673,13 @@ def session_attachments():
 def session_file():
     session_id = _extract_session_id()
     file_id = str(request.args.get("file_id", "")).strip()
+    download = str(request.args.get("download", "")).strip().lower() in {"1", "true", "yes"}
     if not file_id:
         return {"ok": False, "error": "Missing file_id."}, 400
     path = _safe_uploaded_path(session_id, file_id)
     if path is None or not path.exists() or not path.is_file():
         return {"ok": False, "error": "File not found."}, 404
-    return send_from_directory(str(path.parent), path.name)
+    return send_from_directory(str(path.parent), path.name, as_attachment=download)
 
 
 @app.route("/")

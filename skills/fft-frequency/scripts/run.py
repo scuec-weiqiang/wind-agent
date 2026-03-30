@@ -108,6 +108,45 @@ def _load_report_module(skill_scripts_dir: Path):
     return module
 
 
+def _build_natural_summary(assessments, reference_frequency: float) -> list[str]:
+    total = len(assessments)
+    alert_items = [item for item in assessments if item.warning == "二级预警"]
+    watch_items = [item for item in assessments if item.warning == "一级预警"]
+    normal_count = total - len(alert_items) - len(watch_items)
+
+    summary = [
+        f"本次共完成 {total} 个时刻样本的塔架频率识别，现场参考固有频率约为 {reference_frequency:.4f} Hz。"
+    ]
+    if alert_items:
+        summary.append(
+            f"结果中识别出 {len(alert_items)} 个二级预警时刻，建议优先复核对应机组的塔架、基础与施工质量。"
+        )
+    elif watch_items:
+        summary.append(
+            f"结果中暂无二级预警，但识别出 {len(watch_items)} 个一级预警时刻，建议持续跟踪频率变化趋势。"
+        )
+    else:
+        summary.append("本批数据未识别出预警时刻，整体处于可继续常规监测的状态。")
+
+    summary.append(
+        f"状态分布为：正常 {normal_count} 个，一级预警 {len(watch_items)} 个，二级预警 {len(alert_items)} 个。"
+    )
+
+    focus_items = sorted(
+        [item for item in assessments if item.warning in {"一级预警", "二级预警"}],
+        key=lambda item: (item.warning != "二级预警", -item.deviation_pct, item.timestamp),
+    )[:3]
+    if focus_items:
+        summary.append("")
+        summary.append("建议重点关注：")
+        for item in focus_items:
+            ts = item.representative_time or item.timestamp
+            summary.append(
+                f"- {ts:%Y-%m-%d %H:%M:%S}：识别频率 {item.natural_frequency_hz:.4f} Hz，偏离 {item.deviation_pct:.2f}%，{item.warning}。"
+            )
+    return summary
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="")
@@ -153,16 +192,7 @@ def main() -> None:
         print(f"FFT analysis failed: {exc}")
         sys.exit(1)
 
-    lines = [f"现场参考固有频率: {reference_frequency:.4f} Hz"]
-    lines.append("时刻, 当前状态, 识别频率Hz, 偏离程度, 预警")
-    for item in assessments:
-        ts = item.representative_time or item.timestamp
-        lines.append(
-            f"{ts:%Y-%m-%d %H:%M:%S}, {item.state}, "
-            f"{item.natural_frequency_hz:.4f}, {item.deviation_pct:.2f}%, {item.warning}"
-        )
-    lines.append(f"输出文件: {target_dir / 'tower_frequency_windows.csv'}")
-    lines.append(f"输出文件: {target_dir / 'tower_frequency_assessment.csv'}")
+    lines = _build_natural_summary(assessments, reference_frequency)
 
     template_path = skill_dir / "report_template.html"
     try:
@@ -171,20 +201,25 @@ def main() -> None:
             reference_frequency,
             template_path,
         )
-        lines.append(f"输出文件: {report_path}")
     except Exception as exc:
+        lines.append("")
         lines.append(f"HTML 报告生成失败: {exc}")
 
     trend_svg = target_dir / "frequency_trend.svg"
-    if trend_svg.exists():
-        lines.append(f"输出文件: {trend_svg}")
-        if args.session_id:
-            lines.append("")
-            lines.append("频率随时间变化曲线：")
-            lines.append(f"![塔架频率随时间变化曲线](/session/file?session_id={args.session_id}&file_id=frequency_trend.svg)")
-            if 'report_path' in locals() and report_path.exists():
-                lines.append("")
-                lines.append(f"[查看 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name})")
+    if args.session_id and trend_svg.exists():
+        lines.append("")
+        lines.append("频率随时间变化曲线：")
+        lines.append(f"![塔架频率随时间变化曲线](/session/file?session_id={args.session_id}&file_id=frequency_trend.svg)")
+
+    if args.session_id and 'report_path' in locals() and report_path.exists():
+        lines.append("")
+        lines.append("报告文件：")
+        lines.append(f"[查看 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name})")
+        lines.append(f"[下载 HTML 报告](/session/file?session_id={args.session_id}&file_id={report_path.name}&download=1)")
+
+    lines.append("")
+    lines.append(f"结果文件：`{target_dir / 'tower_frequency_assessment.csv'}`")
+    lines.append(f"窗口明细：`{target_dir / 'tower_frequency_windows.csv'}`")
     print("\n".join(lines))
 
 
