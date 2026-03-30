@@ -4,6 +4,7 @@
     "echo": false,
     "email-mail-master": true,
     "fft-frequency": true,
+    "power-curve-assessment": true,
     "shell": true,
     "time": true,
     "weather": true

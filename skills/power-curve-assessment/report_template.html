@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ report_title }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm;
+    }
+    :root {
+      --ink: #1f2d3a;
+      --muted: #617180;
+      --line: #b8c4cc;
+      --panel: #eef5f6;
+      --accent: #11808a;
+      --danger: #b560c7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      font-size: 12px;
+      line-height: 1.5;
+      background: #fff;
+    }
+    .report { width: 100%; }
+    .header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+    }
+    .section { margin-top: 14px; }
+    .section-title {
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      font-size: 14px;
+      font-weight: 700;
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 7px 8px;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #f7fafb;
+      text-align: center;
+      font-weight: 700;
+    }
+    td.label {
+      width: 18%;
+      background: #fafcfd;
+      font-weight: 700;
+    }
+    td.value { width: 32%; }
+    .chart-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .chart-box svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .status-good { color: #18924d; font-weight: 700; }
+    .status-normal { color: #11808a; font-weight: 700; }
+    .status-bad { color: var(--danger); font-weight: 700; }
+    .tip {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .footer {
+      margin-top: 18px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="report">
+    <div class="header">
+      <h1 class="title">{{ report_title }}</h1>
+      <p class="subtitle">报告时间：{{ generated_at }}　数据源：{{ source_name }}</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">一、基础信息</div>
+      <table>
+        <tr>
+          <td class="label">样本数量</td>
+          <td class="value">{{ point_count }}</td>
+          <td class="label">建模样本</td>
+          <td class="value">{{ modeling_point_count }}</td>
+        </tr>
+        <tr>
+          <td class="label">风速范围</td>
+          <td class="value">{{ wind_range }}</td>
+          <td class="label">功率范围</td>
+          <td class="value">{{ power_range }}</td>
+        </tr>
+        <tr>
+          <td class="label">状态仓数</td>
+          <td class="value">{{ fit_count }}</td>
+          <td class="label">包络带外占比</td>
+          <td class="value">{{ outside_ratio }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">二、健康评估</div>
+      <table>
+        <tr>
+          <td class="label">当前状态</td>
+          <td class="value">{{ state }}</td>
+          <td class="label">健康评分</td>
+          <td class="value">{{ health_score }}</td>
+        </tr>
+        <tr>
+          <td class="label">预警</td>
+          <td class="value">{{ warning }}</td>
+          <td class="label">低于下边缘占比</td>
+          <td class="value">{{ below_ratio }}</td>
+        </tr>
+        <tr>
+          <td class="label">检修建议</td>
+          <td colspan="3">{{ advice }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">三、功率曲线与包络带</div>
+      <div class="chart-box">{{ power_curve_svg }}</div>
+      <div class="tip">说明：按 0.1m/s 分仓后提取中值及上下边缘。绿色点表示主密集有效点，紫色点表示偏低异常点。</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">四、分仓统计明细</div>
+      <table>
+        <thead>
+          <tr>
+            <th>风速中心(m/s)</th>
+            <th>中值功率(kW)</th>
+            <th>下边缘(kW)</th>
+            <th>上边缘(kW)</th>
+            <th>样本数</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ fit_rows_html }}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">功率曲线自主评估 Skill 自动生成</div>
+  </div>
+</body>
+</html>
