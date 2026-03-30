@@ -7,15 +7,18 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 :root {
-  --bg-1: #f4f8ff;
-  --bg-2: #eefcf5;
-  --panel: rgba(255, 255, 255, 0.9);
-  --line: rgba(30, 61, 95, 0.13);
-  --line-strong: rgba(53, 98, 148, 0.28);
-  --text: #12324d;
-  --muted: #607890;
-  --accent-1: #2d6cdf;
-  --accent-2: #0f8d73;
+  --bg-1: #f1f8fb;
+  --bg-2: #e8f3f6;
+  --panel: rgba(255, 255, 255, 0.92);
+  --line: rgba(28, 79, 102, 0.1);
+  --line-strong: rgba(31, 124, 132, 0.18);
+  --text: #17384d;
+  --muted: #6a8796;
+  --accent-1: #2d8f9f;
+  --accent-2: #1f7c84;
+  --deepseek-dark: #2f6f84;
+  --deepseek-dark-2: #235f73;
+  --soft-panel: rgba(255, 255, 255, 0.72);
 }
 * { box-sizing: border-box; }
 body {
@@ -24,62 +27,99 @@ body {
   font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 12% 8%, rgba(45, 108, 223, 0.16), transparent 60%),
-    radial-gradient(1000px 700px at 90% 86%, rgba(15, 141, 115, 0.14), transparent 55%),
-    linear-gradient(145deg, var(--bg-1), var(--bg-2));
+    radial-gradient(900px 460px at 50% -10%, rgba(45, 143, 159, 0.08), transparent 55%),
+    linear-gradient(180deg, #f4fafb, #e9f4f6);
 }
 .layout {
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-columns: 290px 1fr;
+  grid-template-columns: 272px 1fr;
 }
 .sidebar {
-  border-right: 1px solid rgba(42, 82, 128, 0.18);
-  background:
-    linear-gradient(180deg, rgba(250, 253, 255, 0.94), rgba(241, 248, 255, 0.86));
-  backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(28, 79, 102, 0.08);
+  background: rgba(244, 250, 251, 0.92);
+  backdrop-filter: blur(12px);
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   min-height: 0;
 }
-.side-head { padding: 18px 14px 10px; }
+.side-head { padding: 16px 14px 10px; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  flex: 0 0 auto;
+  object-fit: contain;
+  display: block;
+}
+.brand-copy {
+  min-width: 0;
+}
 .side-head h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 22px;
+  line-height: 1;
   letter-spacing: 0.2px;
+  color: #184055;
 }
 .side-head p {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #6f86a0;
+  color: #7d98a8;
 }
 .side-actions { padding: 2px 12px 10px; }
 .side-actions button {
   width: 100%;
-  border: none;
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: linear-gradient(145deg, var(--accent-1), var(--accent-2));
-  color: #fff;
+  border: 1px solid rgba(31, 124, 132, 0.14);
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 249, 250, 0.96));
+  color: #184055;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(36, 94, 162, 0.28);
+  box-shadow: 0 6px 16px rgba(31, 124, 132, 0.08);
+}
+.side-actions button:hover {
+  background: linear-gradient(180deg, #ffffff, #f3fbfc);
+  box-shadow: 0 10px 20px rgba(31, 124, 132, 0.12);
 }
 #session-list {
   overflow-y: auto;
   min-height: 0;
   padding: 2px 10px 14px;
 }
-.skills-panel {
-  border-top: 1px solid rgba(42, 82, 128, 0.14);
+.skills-nav {
+  border-top: 1px solid rgba(28, 79, 102, 0.08);
   padding: 12px 10px 14px;
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.44);
+}
+.skills-nav button {
+  width: 100%;
+  border: 1px solid rgba(31, 124, 132, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  color: #25566c;
+  border-radius: 14px;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(31, 124, 132, 0.08);
+}
+.skills-nav button:hover {
+  background: rgba(45, 143, 159, 0.08);
 }
 .trace-panel {
-  border-top: 1px solid rgba(42, 82, 128, 0.14);
+  border-top: 1px solid rgba(28, 79, 102, 0.08);
   padding: 12px 10px 14px;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.34);
 }
 .skills-head {
   display: flex;
@@ -108,7 +148,7 @@ body {
 .skill-actions button:hover {
   background: rgba(45, 108, 223, 0.08);
 }
-#skills-list {
+.sidebar #skills-list {
   display: grid;
   gap: 8px;
   max-height: 38vh;
@@ -408,51 +448,51 @@ body {
 }
 .session-item {
   position: relative;
-  border: 1px solid rgba(52, 96, 146, 0.08);
-  background: rgba(255, 255, 255, 0.68);
-  border-radius: 14px;
+  border: 1px solid rgba(31, 124, 132, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
   text-align: left;
   cursor: pointer;
-  padding: 11px 12px;
+  padding: 12px 13px;
   min-width: 0;
   overflow: hidden;
   transition: all 140ms ease;
 }
 .session-item:hover {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(45, 108, 223, 0.26);
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(31, 124, 132, 0.2);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(36, 82, 130, 0.12);
+  box-shadow: 0 10px 22px rgba(31, 124, 132, 0.1);
 }
 .session-item.active {
-  background: rgba(255, 255, 255, 0.97);
-  border-color: rgba(45, 108, 223, 0.34);
+  background: #ffffff;
+  border-color: rgba(31, 124, 132, 0.24);
   box-shadow:
-    0 8px 22px rgba(32, 82, 136, 0.16),
-    inset 0 0 0 1px rgba(45, 108, 223, 0.08);
+    0 12px 24px rgba(31, 124, 132, 0.1),
+    inset 0 0 0 1px rgba(31, 124, 132, 0.08);
 }
 .session-item.active::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 9px;
-  bottom: 9px;
-  width: 3px;
+  left: 10px;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
   border-radius: 0 999px 999px 0;
   background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
 }
 .session-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #1e3d5b;
+  color: #17384d;
 }
 .session-meta {
   margin-top: 4px;
-  font-size: 11.5px;
-  color: #7a90a8;
+  font-size: 11px;
+  color: #7b97a6;
 }
 .session-del {
   width: 28px;
@@ -483,17 +523,21 @@ body {
   grid-template-rows: auto 1fr auto;
   min-height: 0;
 }
+.main.skill-mode {
+  grid-template-rows: auto 1fr;
+}
 .top {
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.62);
-  padding: 14px 18px;
+  border-bottom: 1px solid rgba(28, 79, 102, 0.08);
+  background: rgba(244, 250, 251, 0.82);
+  padding: 10px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  backdrop-filter: blur(10px);
 }
-.top h1 { margin: 0; font-size: 16px; }
-.top small { color: var(--muted); }
+.top h1 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0.1px; }
+.top small { color: #7c98a6; }
 #top-controls {
   display: flex;
   align-items: center;
@@ -540,56 +584,110 @@ body {
 }
 #session-chip {
   font-size: 12px;
-  color: #36536f;
-  background: rgba(45, 108, 223, 0.1);
-  border: 1px solid rgba(45, 108, 223, 0.2);
+  color: #28556a;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(31, 124, 132, 0.14);
   padding: 6px 10px;
   border-radius: 999px;
 }
 #chat {
-  padding: 20px 24px 30px;
+  padding: 34px 32px 42px;
   overflow-y: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-.msg {
-  width: min(980px, 100%);
+#skill-view {
+  padding: 20px 24px 30px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.skill-view-shell {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+}
+.skill-view-head {
   display: flex;
-  margin: 12px 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.skill-view-title {
+  margin: 0;
+  font-size: 24px;
+  color: #1f4060;
+}
+.skill-view-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6f86a0;
+}
+.skill-view-actions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+.skill-view-actions button {
+  border: 1px solid rgba(45, 108, 223, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: #21415e;
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.skill-view-actions button:hover {
+  background: rgba(45, 108, 223, 0.08);
+}
+.skill-view-grid {
+  display: grid;
+  gap: 10px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+.msg {
+  width: min(920px, 100%);
+  display: flex;
+  margin: 6px 0 16px;
 }
 .msg.user { justify-content: flex-end; }
 .msg.ai { justify-content: flex-start; }
 .ai-stack {
-  width: min(920px, 100%);
+  width: min(900px, 100%);
 }
 .bubble {
   width: fit-content;
-  max-width: min(820px, 92%);
-  border-radius: 20px;
-  padding: 14px 16px;
-  line-height: 1.65;
-  font-size: 16px;
+  max-width: min(820px, 94%);
+  border-radius: 18px;
+  padding: 12px 15px;
+  line-height: 1.75;
+  font-size: 15px;
   white-space: normal;
   word-break: break-word;
 }
 .user .bubble {
-  background: linear-gradient(145deg, #2468d6, #0f8d73);
-  color: #eff7ff;
-  box-shadow: 0 8px 24px rgba(24, 92, 167, 0.28);
+  background: linear-gradient(180deg, var(--deepseek-dark), var(--deepseek-dark-2));
+  color: #f9fafb;
+  box-shadow: 0 8px 20px rgba(31, 41, 55, 0.18);
   white-space: pre-wrap;
+  border-bottom-right-radius: 8px;
 }
 .ai .bubble {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(53, 98, 148, 0.18);
-  box-shadow:
-    0 10px 28px rgba(33, 83, 136, 0.1),
-    0 2px 8px rgba(20, 51, 80, 0.06);
+  width: min(860px, 100%);
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 4px 2px;
+  border-radius: 0;
   white-space: normal;
 }
 .ai .bubble > * {
-  margin: 0 0 0.72em;
+  margin: 0 0 0.9em;
 }
 .ai .bubble > *:last-child {
   margin-bottom: 0;
@@ -609,98 +707,117 @@ body {
   display: block;
   width: min(100%, 760px);
   height: auto;
-  margin: 0.5em 0;
+  margin: 0.8em 0;
   border-radius: 14px;
-  border: 1px solid rgba(53, 98, 148, 0.16);
-  background: rgba(247, 251, 253, 0.95);
-  box-shadow: 0 8px 24px rgba(33, 83, 136, 0.08);
+  border: 1px solid rgba(31, 124, 132, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(31, 124, 132, 0.08);
 }
 .think-box {
-  width: fit-content;
-  max-width: min(820px, 92%);
-  margin-bottom: 10px;
-  border: 1px solid rgba(53, 98, 148, 0.2);
+  width: min(860px, 100%);
+  max-width: min(860px, 100%);
+  margin-bottom: 8px;
+  border: 1px solid rgba(31, 124, 132, 0.12);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 6px 18px rgba(30, 70, 112, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 6px 18px rgba(31, 124, 132, 0.08);
   overflow: hidden;
 }
 .think-summary {
   cursor: pointer;
   user-select: none;
   padding: 10px 14px;
-  font-size: 13px;
-  color: #36536f;
+  font-size: 12px;
+  color: #5b7f8e;
   font-weight: 700;
 }
 .think-content {
   padding: 0 14px 12px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.65;
-  color: #3a546c;
+  color: #426777;
   white-space: pre-wrap;
   word-break: break-word;
 }
 #composer {
   background: transparent;
   border-top: none;
-  padding: 12px 22px 20px;
+  padding: 10px 22px 22px;
 }
 .composer-card,
 .welcome-row {
-  width: min(860px, 100%);
+  width: min(840px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
   align-items: center;
-  border-radius: 22px;
-  border: 1px solid rgba(53, 98, 148, 0.22);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
+  border-radius: 28px;
+  border: 1px solid rgba(31, 124, 132, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
   box-shadow:
-    0 8px 30px rgba(33, 83, 136, 0.12),
-    0 2px 10px rgba(20, 51, 80, 0.08);
-  padding: 10px 10px 10px 16px;
+    0 10px 28px rgba(31, 124, 132, 0.1),
+    0 2px 8px rgba(31, 124, 132, 0.05);
+  padding: 10px 12px 10px 16px;
 }
 #composer .composer-card {
-  width: min(980px, 100%);
+  width: min(860px, 100%);
 }
 .composer-card:focus-within,
 .welcome-row:focus-within {
   border-color: var(--line-strong);
   box-shadow:
-    0 10px 34px rgba(33, 83, 136, 0.18),
-    0 0 0 4px rgba(45, 108, 223, 0.12);
+    0 12px 34px rgba(31, 124, 132, 0.12),
+    0 0 0 4px rgba(45, 143, 159, 0.08);
 }
 #msg, #welcome-msg {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 10px 6px;
-  font-size: 16px;
+  padding: 10px 8px;
+  font-size: 15px;
   color: var(--text);
   outline: none;
 }
 #msg::placeholder, #welcome-msg::placeholder {
-  color: #7990a6;
+  color: #86a0ae;
 }
-#send, #welcome-send, #upload-trigger, #welcome-upload-trigger {
+#send, #welcome-send {
   border: none;
   border-radius: 999px;
-  width: 42px;
-  height: 42px;
-  min-width: 42px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   color: #fff;
   font-weight: 800;
   font-size: 14px;
-  background: linear-gradient(145deg, var(--accent-1), var(--accent-2));
+  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(38, 95, 168, 0.34);
+  box-shadow: 0 6px 16px rgba(31, 124, 132, 0.22);
+}
+#send:hover, #welcome-send:hover {
+  transform: translateY(-1px);
+}
+#send, #welcome-send, #upload-trigger, #welcome-upload-trigger {
+  cursor: pointer;
 }
 #upload-trigger, #welcome-upload-trigger {
-  width: auto;
-  padding: 0 12px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 124, 132, 0.14);
+  background: rgba(241, 249, 250, 0.98);
+  color: #287282;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: none;
+}
+#upload-trigger:hover, #welcome-upload-trigger:hover {
+  background: #e5f4f6;
 }
 #send:disabled, #welcome-send:disabled, #upload-trigger:disabled, #welcome-upload-trigger:disabled {
   opacity: 0.6;
@@ -711,24 +828,42 @@ body {
   height: 100%;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 .welcome-card {
-  width: min(720px, 100%);
+  width: min(760px, 100%);
   text-align: center;
 }
-.welcome-title {
-  margin: 0 0 8px;
-  font-size: clamp(26px, 3.1vw, 38px);
+.welcome-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
 }
-.welcome-sub { margin: 0 0 18px; color: var(--muted); }
+.welcome-brand-mark {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  display: block;
+}
+.welcome-title {
+  margin: 0 0 12px;
+  font-size: clamp(34px, 4vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.welcome-sub {
+  margin: 0 0 26px;
+  color: #7794a2;
+  font-size: 15px;
+  line-height: 1.7;
+}
 .attach-status {
   margin: 8px auto 0;
-  width: min(860px, 100%);
+  width: min(840px, 100%);
   font-size: 12px;
-  color: #36536f;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(53, 98, 148, 0.15);
+  color: #345d70;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(31, 124, 132, 0.1);
   border-radius: 12px;
   padding: 8px 10px;
   line-height: 1.5;
@@ -738,7 +873,7 @@ body {
   white-space: nowrap;
 }
 .welcome-row {
-  padding: 10px 10px 10px 16px;
+  padding: 10px 12px 10px 16px;
 }
 .hidden { display: none !important; }
 @media (max-width: 980px) {
@@ -797,21 +932,19 @@ body {
 <div class="layout">
   <aside class="sidebar">
     <div class="side-head">
-      <h2>Wind Agent</h2>
-      <p>会话列表</p>
+      <div class="brand">
+        <img class="brand-mark" src="data:image/png;base64,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" alt="Wind Agent Logo" />
+        <div class="brand-copy">
+          <h2>Wind Agent</h2>
+        </div>
+      </div>
     </div>
     <div class="side-actions">
       <button id="new-session" onclick="createNewSession(true)">+ 新建会话</button>
     </div>
     <div id="session-list"></div>
-    <section class="skills-panel">
-      <div class="skills-head">
-        <span class="skills-title">Skill 面板</span>
-        <button id="reload-skills" type="button">Reload</button>
-      </div>
-      <div id="skills-list">
-        <div class="skill-empty">正在加载 skill...</div>
-      </div>
+    <section class="skills-nav">
+      <button id="open-skills-view" type="button">Skill 面板</button>
     </section>
     <section class="trace-panel">
       <div class="skills-head">
@@ -855,10 +988,31 @@ body {
 
     <main id="chat" class="hidden"></main>
 
+    <main id="skill-view" class="hidden">
+      <div class="skill-view-shell">
+        <div class="skill-view-head">
+          <div>
+            <h2 class="skill-view-title">Skill 面板</h2>
+            <p class="skill-view-sub">在这里查看、运行和管理当前已加载的技能。</p>
+          </div>
+          <div class="skill-view-actions">
+            <button id="back-to-chat" type="button">返回会话</button>
+            <button id="reload-skills" type="button">Reload</button>
+          </div>
+        </div>
+        <div id="skills-list" class="skill-view-grid">
+          <div class="skill-empty">正在加载 skill...</div>
+        </div>
+      </div>
+    </main>
+
     <section id="welcome">
       <div class="welcome-card">
+        <div class="welcome-brand">
+          <img class="welcome-brand-mark" src="data:image/png;base64,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" alt="Wind Agent Logo" />
+        </div>
         <h2 class="welcome-title">你好，我是 Wind Agent</h2>
-        <p class="welcome-sub">请先点击左侧会话，或直接在这里开始新对话。</p>
+        <p class="welcome-sub">围绕风机运行分析、文件解读和报告生成，开始一段更自然的对话。</p>
         <div class="welcome-row">
           <input id="welcome-msg" placeholder="比如：帮我总结一下这段内容" />
           <div class="composer-tools">
@@ -866,7 +1020,7 @@ body {
               <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
             </div>
           </div>
-          <button id="welcome-upload-trigger" type="button">上传文件</button>
+          <button id="welcome-upload-trigger" type="button" title="上传文件" aria-label="上传文件">+</button>
           <button id="welcome-send" onclick="sendFromWelcome()">↑</button>
         </div>
         <div id="welcome-attachment-status" class="attach-status hidden"></div>
@@ -881,7 +1035,7 @@ body {
             <button type="button" class="thinking-btn" data-role="thinking-cycle">思考: 自动</button>
           </div>
         </div>
-        <button id="upload-trigger" type="button">上传文件</button>
+        <button id="upload-trigger" type="button" title="上传文件" aria-label="上传文件">+</button>
         <button id="send" onclick="send()">↑</button>
       </div>
       <div id="composer-attachment-status" class="attach-status hidden"></div>
@@ -901,8 +1055,10 @@ const SESSION_KEY = "wind_session_id";
 const THINKING_MODE_KEY = "wind_thinking_mode";
 
 const chat = document.getElementById("chat");
+const skillView = document.getElementById("skill-view");
 const welcome = document.getElementById("welcome");
 const composer = document.getElementById("composer");
+const mainPanel = document.querySelector(".main");
 const input = document.getElementById("msg");
 const welcomeInput = document.getElementById("welcome-msg");
 const sendBtn = document.getElementById("send");
@@ -918,6 +1074,8 @@ const sessionChip = document.getElementById("session-chip");
 const thinkingModeButtons = Array.from(document.querySelectorAll("[data-role='thinking-cycle']"));
 const skillsList = document.getElementById("skills-list");
 const reloadSkillsBtn = document.getElementById("reload-skills");
+const openSkillsViewBtn = document.getElementById("open-skills-view");
+const backToChatBtn = document.getElementById("back-to-chat");
 const traceList = document.getElementById("trace-list");
 const reloadTraceBtn = document.getElementById("reload-trace");
 const traceCount = document.getElementById("trace-count");
@@ -928,6 +1086,7 @@ let thinkingMode = "auto";
 let skillsCache = [];
 let traceCache = [];
 let attachedFiles = [];
+let currentMainView = "welcome";
 
 function loadThinkingMode() {
   const value = localStorage.getItem(THINKING_MODE_KEY) || "auto";
@@ -984,16 +1143,40 @@ function deriveTitle(text) {
 
 function setWelcomeMode(enabled) {
   if (enabled) {
+    currentMainView = "welcome";
     welcome.classList.remove("hidden");
     chat.classList.add("hidden");
+    skillView.classList.add("hidden");
     composer.classList.add("hidden");
+    mainPanel.classList.remove("skill-mode");
     sessionChip.textContent = "Session: 未选择";
     return;
   }
+  currentMainView = "chat";
   welcome.classList.add("hidden");
   chat.classList.remove("hidden");
+  skillView.classList.add("hidden");
   composer.classList.remove("hidden");
+  mainPanel.classList.remove("skill-mode");
   sessionChip.textContent = `Session: ${currentSessionId ? currentSessionId.slice(0, 8) : "-"}`;
+}
+
+function showSkillView() {
+  currentMainView = "skill";
+  welcome.classList.add("hidden");
+  chat.classList.add("hidden");
+  composer.classList.add("hidden");
+  skillView.classList.remove("hidden");
+  mainPanel.classList.add("skill-mode");
+  sessionChip.textContent = "Session: Skill 面板";
+}
+
+function returnToChatView() {
+  if (currentSessionId) {
+    setWelcomeMode(false);
+  } else {
+    setWelcomeMode(true);
+  }
 }
 
 function renderAttachmentStatus() {
@@ -1352,6 +1535,7 @@ async function runSkillFromPanel(skillName, skillInput = "") {
     await createNewSession(true);
     if (!currentSessionId) return;
   }
+  setWelcomeMode(false);
   addMessage("user", `:skill ${skillName}${skillInput ? ` ${skillInput}` : ""}`);
   const aiMessage = addAssistantMessage("", "");
   try {
@@ -1816,6 +2000,8 @@ thinkingModeButtons.forEach((button) => {
 });
 
 reloadSkillsBtn.addEventListener("click", reloadSkills);
+openSkillsViewBtn.addEventListener("click", showSkillView);
+backToChatBtn.addEventListener("click", returnToChatView);
 reloadTraceBtn.addEventListener("click", refreshTrace);
 uploadBtn.addEventListener("click", uploadAndAnalyze);
 welcomeUploadBtn.addEventListener("click", uploadAndAnalyze);
