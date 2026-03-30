@@ -30,11 +30,146 @@ body {
     radial-gradient(900px 460px at 50% -10%, rgba(45, 143, 159, 0.08), transparent 55%),
     linear-gradient(180deg, #f4fafb, #e9f4f6);
 }
+body.dark-theme {
+  color: #d7ebf2;
+  background:
+    radial-gradient(900px 460px at 50% -10%, rgba(45, 143, 159, 0.14), transparent 55%),
+    linear-gradient(180deg, #0d1720, #101d27);
+}
+body.dark-theme #intro-overlay {
+  background:
+    radial-gradient(560px 320px at 50% 50%, rgba(10, 20, 28, 0.7), rgba(10, 20, 28, 0.36) 55%, rgba(10, 20, 28, 0) 76%);
+}
+body.intro-active {
+  overflow: hidden;
+}
 .layout {
   width: 100vw;
   height: 100vh;
   display: grid;
   grid-template-columns: 272px 1fr;
+}
+#intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  opacity: 1;
+  background:
+    radial-gradient(560px 320px at 50% 50%, rgba(255, 255, 255, 0.68), rgba(244, 250, 251, 0.28) 55%, rgba(244, 250, 251, 0) 76%);
+  transition: opacity 520ms ease;
+}
+body.intro-complete #intro-overlay {
+  opacity: 0;
+}
+.intro-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.intro-logo {
+  width: min(32vw, 240px);
+  height: min(32vw, 240px);
+  padding: 0;
+  object-fit: contain;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  transform: rotate(0deg) scale(1);
+  transform-origin: center center;
+  box-shadow: none;
+  filter: drop-shadow(0 12px 28px rgba(31, 124, 132, 0.16));
+  will-change: transform, opacity;
+}
+body.intro-complete .intro-logo {
+  opacity: 0;
+}
+@keyframes intro-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+body.intro-active .sidebar,
+body.intro-active .top,
+body.intro-active #welcome,
+body.intro-active #chat,
+body.intro-active #composer,
+body.intro-active #skill-view {
+  opacity: 0;
+  transform: translateY(22px);
+}
+body.intro-active .welcome-brand,
+body.intro-active .welcome-title,
+body.intro-active .welcome-sub,
+body.intro-active .welcome-row,
+body.intro-active #welcome-attachment-status,
+body.intro-active .side-head,
+body.intro-active .side-actions,
+body.intro-active #session-list,
+body.intro-active .skills-nav,
+body.intro-active .trace-panel,
+body.intro-active .top > div {
+  opacity: 0;
+  transform: translateY(26px);
+}
+body.intro-complete .sidebar,
+body.intro-complete .top,
+body.intro-complete #welcome,
+body.intro-complete #chat,
+body.intro-complete #composer,
+body.intro-complete #skill-view {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+body.intro-complete .sidebar {
+  animation-delay: 0ms;
+}
+body.intro-complete .top {
+  animation-delay: 120ms;
+}
+body.intro-complete #welcome,
+body.intro-complete #chat,
+body.intro-complete #skill-view {
+  animation-delay: 240ms;
+}
+body.intro-complete #composer {
+  animation-delay: 340ms;
+}
+body.intro-complete .side-head,
+body.intro-complete .top > div {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 40ms;
+}
+body.intro-complete .side-actions,
+body.intro-complete .welcome-brand {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 140ms;
+}
+body.intro-complete #session-list,
+body.intro-complete .welcome-title {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 240ms;
+}
+body.intro-complete .skills-nav,
+body.intro-complete .welcome-sub {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 340ms;
+}
+body.intro-complete .trace-panel,
+body.intro-complete .welcome-row {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 440ms;
+}
+body.intro-complete #welcome-attachment-status {
+  animation: intro-float-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 520ms;
 }
 .sidebar {
   border-right: 1px solid rgba(28, 79, 102, 0.08);
@@ -467,19 +602,11 @@ body {
 .session-item.active {
   background: #ffffff;
   border-color: rgba(31, 124, 132, 0.24);
+  transform: scale(1.035);
   box-shadow:
-    0 12px 24px rgba(31, 124, 132, 0.1),
-    inset 0 0 0 1px rgba(31, 124, 132, 0.08);
-}
-.session-item.active::before {
-  content: "";
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  bottom: 10px;
-  width: 4px;
-  border-radius: 0 999px 999px 0;
-  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
+    0 18px 34px rgba(31, 124, 132, 0.16),
+    0 4px 12px rgba(31, 124, 132, 0.1),
+    inset 0 0 0 1px rgba(31, 124, 132, 0.1);
 }
 .session-title {
   font-size: 13px;
@@ -544,6 +671,20 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+#theme-toggle {
+  border: 1px solid rgba(31, 124, 132, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: #25566c;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(31, 124, 132, 0.08);
+}
+#theme-toggle:hover {
+  background: rgba(45, 143, 159, 0.08);
 }
 .composer-tools {
   display: inline-flex;
@@ -845,6 +986,20 @@ body {
   object-fit: contain;
   display: block;
 }
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  #intro-overlay,
+  .intro-logo,
+  body.intro-complete .sidebar,
+  body.intro-complete .top,
+  body.intro-complete #welcome,
+  body.intro-complete #chat,
+  body.intro-complete #composer,
+  body.intro-complete #skill-view {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 .welcome-title {
   margin: 0 0 12px;
   font-size: clamp(34px, 4vw, 52px);
@@ -926,9 +1081,131 @@ body {
     justify-content: space-between;
   }
 }
+body.dark-theme .sidebar {
+  border-right-color: rgba(108, 161, 181, 0.12);
+  background: rgba(13, 25, 35, 0.92);
+}
+body.dark-theme .side-head h2,
+body.dark-theme .session-title,
+body.dark-theme .top h1,
+body.dark-theme .welcome-title,
+body.dark-theme .skill-view-title,
+body.dark-theme .skill-name,
+body.dark-theme .trace-event {
+  color: #e3f3f7;
+}
+body.dark-theme .side-head p,
+body.dark-theme .session-meta,
+body.dark-theme .top small,
+body.dark-theme .welcome-sub,
+body.dark-theme .skill-dir,
+body.dark-theme .trace-time,
+body.dark-theme .skill-view-sub,
+body.dark-theme .skill-empty,
+body.dark-theme .trace-empty {
+  color: #8fa9b6;
+}
+body.dark-theme .side-actions button,
+body.dark-theme .skills-nav button,
+body.dark-theme .skills-head button,
+body.dark-theme .skill-actions button,
+body.dark-theme .skill-view-actions button,
+body.dark-theme #theme-toggle {
+  background: rgba(18, 33, 45, 0.92);
+  color: #d8edf4;
+  border-color: rgba(78, 141, 165, 0.24);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+}
+body.dark-theme .skills-nav,
+body.dark-theme .trace-panel {
+  background: rgba(14, 27, 38, 0.56);
+  border-top-color: rgba(108, 161, 181, 0.12);
+}
+body.dark-theme .session-item,
+body.dark-theme .skill-card,
+body.dark-theme .trace-item,
+body.dark-theme .skill-md,
+body.dark-theme .think-box,
+body.dark-theme .ai .bubble,
+body.dark-theme .composer-card,
+body.dark-theme .welcome-row,
+body.dark-theme .attach-status {
+  background: rgba(18, 32, 44, 0.82);
+  border-color: rgba(108, 161, 181, 0.14);
+  color: #d7ebf2;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+body.dark-theme .session-item:hover {
+  background: rgba(24, 39, 52, 0.94);
+  border-color: rgba(78, 141, 165, 0.28);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+body.dark-theme .session-item.active {
+  background: rgba(28, 45, 58, 0.98);
+  border-color: rgba(92, 175, 190, 0.36);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.34),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(92, 175, 190, 0.14);
+}
+body.dark-theme .top {
+  background: rgba(12, 23, 32, 0.82);
+  border-bottom-color: rgba(108, 161, 181, 0.12);
+}
+body.dark-theme #session-chip {
+  color: #d8edf4;
+  background: rgba(18, 33, 45, 0.92);
+  border-color: rgba(78, 141, 165, 0.24);
+}
+body.dark-theme .user .bubble {
+  background: linear-gradient(180deg, #245f73, #1b4f63);
+  color: #f2fbfd;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+}
+body.dark-theme #msg,
+body.dark-theme #welcome-msg,
+body.dark-theme .think-content,
+body.dark-theme .trace-data,
+body.dark-theme .skill-desc,
+body.dark-theme .skill-when,
+body.dark-theme .skill-command,
+body.dark-theme .skill-meta,
+body.dark-theme .skill-md-body,
+body.dark-theme .ai .bubble {
+  color: #d7ebf2;
+}
+body.dark-theme #msg::placeholder,
+body.dark-theme #welcome-msg::placeholder {
+  color: #6f8b99;
+}
+body.dark-theme .thinking-toggle,
+body.dark-theme #upload-trigger,
+body.dark-theme #welcome-upload-trigger {
+  background: rgba(22, 39, 52, 0.92);
+  border-color: rgba(78, 141, 165, 0.24);
+  color: #d7ebf2;
+}
+body.dark-theme .thinking-btn {
+  color: #d7ebf2;
+}
+body.dark-theme .thinking-btn.active,
+body.dark-theme #send,
+body.dark-theme #welcome-send {
+  background: linear-gradient(180deg, #2d8f9f, #1f7c84);
+  color: #effcfe;
+}
+body.dark-theme .ai .bubble img {
+  background: rgba(14, 27, 38, 0.94);
+  border-color: rgba(108, 161, 181, 0.14);
+}
 </style>
 </head>
-<body>
+<body class="intro-active">
+<div id="intro-overlay" aria-hidden="true">
+  <div class="intro-card">
+    <img id="intro-logo" class="intro-logo" src="data:image/png;base64,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" alt="" />
+  </div>
+</div>
 <div class="layout">
   <aside class="sidebar">
     <div class="side-head">
@@ -982,6 +1259,7 @@ body {
         <small>你的智能风机助手</small>
       </div>
       <div id="top-controls">
+        <button id="theme-toggle" type="button">暗黑模式</button>
         <span id="session-chip">Session: 未选择</span>
       </div>
     </header>
@@ -1053,6 +1331,7 @@ marked.setOptions({
 const STORAGE_KEY = "wind_sessions_v2";
 const SESSION_KEY = "wind_session_id";
 const THINKING_MODE_KEY = "wind_thinking_mode";
+const THEME_KEY = "wind_theme";
 
 const chat = document.getElementById("chat");
 const skillView = document.getElementById("skill-view");
@@ -1071,6 +1350,7 @@ const welcomeAttachmentStatus = document.getElementById("welcome-attachment-stat
 const newSessionBtn = document.getElementById("new-session");
 const sessionList = document.getElementById("session-list");
 const sessionChip = document.getElementById("session-chip");
+const themeToggleBtn = document.getElementById("theme-toggle");
 const thinkingModeButtons = Array.from(document.querySelectorAll("[data-role='thinking-cycle']"));
 const skillsList = document.getElementById("skills-list");
 const reloadSkillsBtn = document.getElementById("reload-skills");
@@ -1079,6 +1359,10 @@ const backToChatBtn = document.getElementById("back-to-chat");
 const traceList = document.getElementById("trace-list");
 const reloadTraceBtn = document.getElementById("reload-trace");
 const traceCount = document.getElementById("trace-count");
+const introOverlay = document.getElementById("intro-overlay");
+const introLogo = document.getElementById("intro-logo");
+const brandMark = document.querySelector(".brand-mark");
+const welcomeBrandMark = document.querySelector(".welcome-brand-mark");
 
 let sessions = [];
 let currentSessionId = "";
@@ -1087,6 +1371,24 @@ let skillsCache = [];
 let traceCache = [];
 let attachedFiles = [];
 let currentMainView = "welcome";
+
+function loadTheme() {
+  const value = localStorage.getItem(THEME_KEY) || "light";
+  return value === "dark" ? "dark" : "light";
+}
+
+function setTheme(theme) {
+  const isDark = theme === "dark";
+  document.body.classList.toggle("dark-theme", isDark);
+  localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+  if (themeToggleBtn) {
+    themeToggleBtn.textContent = isDark ? "浅色模式" : "暗黑模式";
+  }
+}
+
+function toggleTheme() {
+  setTheme(document.body.classList.contains("dark-theme") ? "light" : "dark");
+}
 
 function loadThinkingMode() {
   const value = localStorage.getItem(THINKING_MODE_KEY) || "auto";
@@ -1138,7 +1440,27 @@ function formatTime(ts) {
 
 function deriveTitle(text) {
   const t = (text || "").trim();
-  return t ? t.slice(0, 40) : "新会话";
+  if (!t) return "新会话";
+
+  const cleaned = t
+    .replace(/\s+/g, " ")
+    .replace(/^[“"'`]+|[”"'`]+$/g, "")
+    .replace(/^(请问|帮我|麻烦|请你|我想|我希望|能否|能不能|可以|可不可以|是否|关于)+/u, "")
+    .replace(/(一下|一下子|看看|试试|吧|吗|呢|呀|啊|嘛)+$/u, "")
+    .replace(/[？?！!。；;，,：:]+$/u, "")
+    .trim();
+
+  const clauses = cleaned
+    .split(/[，,。；;：:\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const base = (clauses[0] || cleaned || t)
+    .replace(/^(把|将|给|让|对|在|用)+/u, "")
+    .trim();
+
+  const shortened = base.length > 16 ? `${base.slice(0, 16)}...` : base;
+  return shortened || "新会话";
 }
 
 function setWelcomeMode(enabled) {
@@ -1239,7 +1561,7 @@ function renderSessions() {
 
     const meta = document.createElement("div");
     meta.className = "session-meta";
-    meta.textContent = formatTime(s.updatedAt);
+    meta.textContent = "";
 
     item.appendChild(title);
     item.appendChild(meta);
@@ -1257,6 +1579,75 @@ function renderSessions() {
     row.appendChild(del);
     sessionList.appendChild(row);
   });
+}
+
+function completeIntroImmediately() {
+  document.body.classList.remove("intro-active");
+  document.body.classList.add("intro-complete");
+}
+
+function getIntroTarget() {
+  return brandMark || welcomeBrandMark;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function runIntroAnimation() {
+  if (!introOverlay || !introLogo) {
+    completeIntroImmediately();
+    return;
+  }
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  const startSize = Math.min(window.innerWidth, window.innerHeight, 760) * 0.24;
+
+  introLogo.style.width = `${startSize}px`;
+  introLogo.style.height = `${startSize}px`;
+  introLogo.style.opacity = "1";
+  introLogo.style.transition = "none";
+  introLogo.style.transform = "translate(0px, 0px) rotate(0deg) scale(1.08)";
+
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await sleep(120);
+
+  const animation = introLogo.animate(
+    [
+      {
+        transform: "translate(0px, 0px) rotate(0deg) scale(1.08)",
+        opacity: 1,
+        offset: 0,
+      },
+      {
+        transform: "translate(0px, 0px) rotate(420deg) scale(1)",
+        opacity: 1,
+        offset: 0.72,
+      },
+      {
+        transform: "translate(0px, 0px) rotate(540deg) scale(0.94)",
+        opacity: 0,
+        offset: 1,
+      },
+    ],
+    {
+      duration: 1500,
+      easing: "cubic-bezier(0.2, 0.82, 0.2, 1)",
+      fill: "forwards",
+    }
+  );
+
+  await sleep(980);
+  document.body.classList.remove("intro-active");
+  document.body.classList.add("intro-complete");
+
+  try {
+    await animation.finished;
+  } catch {
+  }
+
+  await sleep(240);
+  if (introOverlay) introOverlay.remove();
 }
 
 function renderSkills(skills = []) {
@@ -2000,6 +2391,7 @@ thinkingModeButtons.forEach((button) => {
 });
 
 reloadSkillsBtn.addEventListener("click", reloadSkills);
+themeToggleBtn.addEventListener("click", toggleTheme);
 openSkillsViewBtn.addEventListener("click", showSkillView);
 backToChatBtn.addEventListener("click", returnToChatView);
 reloadTraceBtn.addEventListener("click", refreshTrace);
@@ -2009,7 +2401,10 @@ uploadInput.addEventListener("change", handleSelectedUploads);
 
 (async () => {
   sessions = loadSessions();
+  setTheme(loadTheme());
   setThinkingMode(loadThinkingMode());
+  setWelcomeMode(true);
+  runIntroAnimation();
   renderSessions();
   await refreshSkills();
   await syncSessionsFromServer();
@@ -2017,7 +2412,6 @@ uploadInput.addEventListener("change", handleSelectedUploads);
   renderTrace([]);
   currentSessionId = "";
   localStorage.removeItem(SESSION_KEY);
-  setWelcomeMode(true);
   welcomeInput.focus();
 })();
 </script>
