@@ -71,6 +71,17 @@ class SkillDefinition:
     source_path: str
 
 
+@dataclass(frozen=True)
+class SkillExecutionResult:
+    skill_id: str
+    ok: bool
+    output_text: str
+    structured_data: Any = None
+    summary: str = ""
+    exit_code: int = 0
+    stderr: str = ""
+
+
 def normalize_skill_key(value: str) -> str:
     normalized = str(value or "").strip().lower()
     normalized = re.sub(r"[\s_]+", "-", normalized)
@@ -213,6 +224,11 @@ class SkillManager:
         )
 
     def execute(self, name: str, args: Any = "", session: Optional[any] = None) -> str:
+        return self.execute_result(name, args=args, session=session).output_text
+
+    def execute_result(
+        self, name: str, args: Any = "", session: Optional[any] = None
+    ) -> SkillExecutionResult:
         skill, matched_by = self.resolve_skill(name)
         print(
             f"[skill-resolve] requested_name={name!r} "
@@ -231,7 +247,7 @@ class SkillManager:
             if missing_bins:
                 reasons.append(f"missing bins: {', '.join(missing_bins)}")
             raise SkillUnavailable(skill.skill_id, "; ".join(reasons) or "requirements not met")
-        return skill.run(args=args, session=session)
+        return skill.run_result(args=args, session=session)
 
     def names(self, include_disabled: bool = False) -> Iterable[str]:
         if include_disabled:
@@ -275,6 +291,9 @@ class SkillManager:
                 lines.append(f"  required_env: {', '.join(skill.required_env)}")
             if skill.required_bins:
                 lines.append(f"  required_bins: {', '.join(skill.required_bins)}")
+            lines.append(f"  structured_result: {str(skill.structured_result).lower()}")
+            if skill.workflow_hint:
+                lines.append(f"  workflow_hint: {skill.workflow_hint}")
             lines.append(
                 f"  invocation: {'packaged_runtime' if skill.has_runtime else 'manual_only'}"
             )
@@ -386,6 +405,9 @@ class SkillPack:
         )
 
     def run(self, args: Any = "", session=None) -> str:
+        return self.run_result(args=args, session=session).output_text
+
+    def run_result(self, args: Any = "", session=None) -> SkillExecutionResult:
         if not self.has_runtime:
             raise SkillUnavailable(
                 self.skill_id,
@@ -411,15 +433,36 @@ class SkillPack:
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:
-            return f"Skill '{self.name}' timed out after {timeout}s."
+            return SkillExecutionResult(
+                skill_id=self.skill_id,
+                ok=False,
+                output_text=f"Skill '{self.name}' timed out after {timeout}s.",
+                summary=f"{self.display_name} timed out",
+                exit_code=124,
+            )
         except Exception as exc:  # pragma: no cover
-            return f"Skill '{self.name}' failed to run: {exc}"
+            return SkillExecutionResult(
+                skill_id=self.skill_id,
+                ok=False,
+                output_text=f"Skill '{self.name}' failed to run: {exc}",
+                summary=f"{self.display_name} failed",
+                exit_code=1,
+                stderr=str(exc),
+            )
 
         stdout = (proc.stdout or "").strip()
         stderr = (proc.stderr or "").strip()
         if proc.returncode != 0:
-            return stderr or stdout or f"Skill '{self.name}' failed with exit_code={proc.returncode}."
-        return stdout or "(no output)"
+            text = stderr or stdout or f"Skill '{self.name}' failed with exit_code={proc.returncode}."
+            return SkillExecutionResult(
+                skill_id=self.skill_id,
+                ok=False,
+                output_text=text,
+                summary=f"{self.display_name} failed",
+                exit_code=proc.returncode,
+                stderr=stderr,
+            )
+        return _parse_skill_execution_result(self.skill_id, stdout, stderr)
 
     def to_dict(self) -> dict[str, str | list[str]]:
         return {
@@ -442,6 +485,8 @@ class SkillPack:
             "primary_env": self.primary_env,
             "availability": self.availability(),
             "enabled": self.enabled,
+            "structured_result": self.structured_result,
+            "workflow_hint": self.workflow_hint,
         }
 
     def render_markdown(self) -> str:
@@ -506,6 +551,22 @@ class SkillPack:
     def primary_env(self) -> str:
         value = self.openclaw_meta.get("primaryEnv")
         return str(value).strip() if value is not None else ""
+
+    @property
+    def structured_result(self) -> bool:
+        value = self.metadata.get("structured-result")
+        if isinstance(value, bool):
+            return value
+        value = self.openclaw_meta.get("structured-result")
+        return bool(value) if isinstance(value, bool) else False
+
+    @property
+    def workflow_hint(self) -> str:
+        value = self.metadata.get("workflow-hint")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        value = self.openclaw_meta.get("workflow-hint")
+        return value.strip() if isinstance(value, str) and value.strip() else ""
 
 
 class _SafeFormatDict(dict[str, str]):
@@ -822,3 +883,85 @@ def _resolve_command_template(parsed: dict[str, Any], pack_dir: Path) -> list[st
         ]
 
     return []
+
+
+def _parse_skill_execution_result(
+    skill_id: str,
+    stdout: str,
+    stderr: str,
+) -> SkillExecutionResult:
+    raw = (stdout or "").strip()
+    if not raw:
+        return SkillExecutionResult(
+            skill_id=skill_id,
+            ok=True,
+            output_text="(no output)",
+            summary="completed with no output",
+            structured_data=None,
+            exit_code=0,
+            stderr=stderr,
+        )
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return SkillExecutionResult(
+            skill_id=skill_id,
+            ok=True,
+            output_text=raw,
+            summary=_derive_summary_from_output(raw),
+            structured_data=None,
+            exit_code=0,
+            stderr=stderr,
+        )
+
+    if isinstance(payload, dict) and payload.get("kind") == "openclaw_skill_result":
+        ok = bool(payload.get("ok", True))
+        summary = str(payload.get("summary", "")).strip()
+        output_text = str(payload.get("output_text", "")).strip()
+        structured_data = payload.get("data")
+        if not output_text:
+            if structured_data is not None:
+                output_text = json.dumps(structured_data, ensure_ascii=False, indent=2)
+            else:
+                output_text = summary or "(no output)"
+        if not summary:
+            summary = _derive_summary_from_output(output_text)
+        return SkillExecutionResult(
+            skill_id=skill_id,
+            ok=ok,
+            output_text=output_text,
+            structured_data=structured_data,
+            summary=summary,
+            exit_code=0 if ok else 1,
+            stderr=stderr,
+        )
+
+    return SkillExecutionResult(
+        skill_id=skill_id,
+        ok=True,
+        output_text=raw,
+        structured_data=payload,
+        summary=_derive_summary_from_payload(payload),
+        exit_code=0,
+        stderr=stderr,
+    )
+
+
+def _derive_summary_from_output(text: str, limit: int = 140) -> str:
+    single = " ".join(str(text or "").split())
+    if not single:
+        return "completed"
+    return single[:limit]
+
+
+def _derive_summary_from_payload(payload: Any) -> str:
+    if isinstance(payload, dict):
+        for key in ("summary", "message", "title", "status"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return _derive_summary_from_output(json.dumps(payload, ensure_ascii=False))
+    if isinstance(payload, list):
+        return f"returned {len(payload)} items"
+    return _derive_summary_from_output(str(payload))

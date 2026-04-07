@@ -4,6 +4,7 @@ name: 功率曲线自主评估
 description: 基于 csv 风电运行数据生成风速-功率散点图、拟合功率曲线和 HTML 报告，适合批量评估功率曲线偏差与运行状态。
 command: ["{python}", "scripts/run.py", "--input", "{input}", "--session-id", "{session_id}"]
 aliases: ["power-curve", "powercurve", "功率曲线", "功率曲线分析", "功率曲线自主评估"]
+metadata: {"structured-result": true, "workflow-hint": "report"}
 ---
 
 # 功率曲线自主评估

@@ -1,6 +1,7 @@
 ---
 name: time
 description: 获取当前本地时间，支持自定义时间格式。
+metadata: {"structured-result": true, "workflow-hint": "utility"}
 ---
 
 # time

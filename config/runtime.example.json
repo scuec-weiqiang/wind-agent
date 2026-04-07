@@ -1,12 +1,13 @@
 {
-  "model_provider": "ollama",
-  "model_name": "qwen3.5:9b",
-  "model_base_url": "http://localhost:11434/api/chat",
-  "model_api_key": "",
+  "model_provider": "openai_compatible",
+  "model_name": "deepseek-chat",
+  "model_base_url": "https://api.deepseek.com/chat/completions",
+  "model_api_key": "sk-your-api-key",
   "thinking_mode": "auto",
-  "system_prompt": "You are a helpful agent coordinating between the user and available skills.",
+  "system_prompt": "You are a helpful local assistant coordinating between the user and available skills.",
   "shell_timeout": 0,
   "enable_thinking": true,
+  "enable_skill_autorun": false,
   "env": {
     "OPENAI_API_KEY": ""
   }

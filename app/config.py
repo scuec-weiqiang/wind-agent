@@ -22,6 +22,7 @@ KEY_ENV_MAP = {
     "shell_timeout": "SHELL_TIMEOUT",
     "shell_cwd": "SHELL_CWD",
     "enable_thinking": "ENABLE_THINKING",
+    "enable_skill_autorun": "ENABLE_SKILL_AUTORUN",
 }
 
 

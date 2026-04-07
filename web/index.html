@@ -880,6 +880,177 @@ body.intro-complete #welcome-attachment-status {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.run-box {
+  width: min(860px, 100%);
+  max-width: min(860px, 100%);
+  margin-bottom: 8px;
+  border: 1px solid rgba(31, 124, 132, 0.12);
+  border-radius: 16px;
+  background: rgba(240, 249, 250, 0.82);
+  box-shadow: 0 6px 18px rgba(31, 124, 132, 0.06);
+  padding: 10px 14px 12px;
+}
+.run-box[open] {
+  padding-bottom: 12px;
+}
+.run-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.run-summary::-webkit-details-marker {
+  display: none;
+}
+.run-summary-main {
+  min-width: 0;
+  flex: 1;
+}
+.run-summary-aside {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  color: #6b8a98;
+}
+.run-body {
+  margin-top: 10px;
+}
+.run-panels {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.run-panel {
+  border-radius: 12px;
+  border: 1px solid rgba(31, 124, 132, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  padding: 8px 10px;
+}
+.run-panel.hidden {
+  display: none;
+}
+.run-panel-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #5d7f8f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.run-panel-body {
+  font-size: 12px;
+  color: #3e6573;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.run-panel-body.compact-list {
+  display: grid;
+  gap: 4px;
+}
+.run-panel-item {
+  border-radius: 10px;
+  background: rgba(241, 248, 251, 0.9);
+  padding: 6px 8px;
+}
+.run-panel-item strong {
+  color: #28566b;
+}
+.run-artifact {
+  color: #1f6a80;
+  text-decoration: none;
+}
+.run-artifact:hover {
+  text-decoration: underline;
+}
+.run-status {
+  font-size: 12px;
+  font-weight: 800;
+  color: #37697b;
+}
+.run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.run-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(31, 124, 132, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #466d7d;
+}
+.run-tools {
+  display: grid;
+  gap: 6px;
+}
+.run-tool {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(31, 124, 132, 0.08);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #3e6573;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.run-tool.phase-start {
+  border-left: 3px solid rgba(45, 143, 159, 0.68);
+}
+.run-tool.phase-end {
+  border-left: 3px solid rgba(37, 127, 88, 0.56);
+}
+.run-tool-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.run-tool-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #28566b;
+}
+.run-tool-phase {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b8a98;
+}
+.run-tool-summary,
+.run-tool-preview,
+.run-tool-structured {
+  margin-top: 4px;
+}
+.run-tool-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #5d7f8f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.run-tool-value {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #3e6573;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.run-tool-structured .run-tool-value {
+  max-height: 132px;
+  overflow: auto;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(241, 248, 251, 0.92);
+  border: 1px solid rgba(31, 124, 132, 0.08);
+}
 #composer {
   background: transparent;
   border-top: none;
@@ -1126,6 +1297,7 @@ body.dark-theme .skill-card,
 body.dark-theme .trace-item,
 body.dark-theme .skill-md,
 body.dark-theme .think-box,
+body.dark-theme .run-box,
 body.dark-theme .ai .bubble,
 body.dark-theme .composer-card,
 body.dark-theme .welcome-row,
@@ -1165,6 +1337,7 @@ body.dark-theme .user .bubble {
 body.dark-theme #msg,
 body.dark-theme #welcome-msg,
 body.dark-theme .think-content,
+body.dark-theme .run-tool,
 body.dark-theme .trace-data,
 body.dark-theme .skill-desc,
 body.dark-theme .skill-when,
@@ -1173,6 +1346,48 @@ body.dark-theme .skill-meta,
 body.dark-theme .skill-md-body,
 body.dark-theme .ai .bubble {
   color: #d7ebf2;
+}
+body.dark-theme .run-status {
+  color: #9dc8d5;
+}
+body.dark-theme .run-summary-aside {
+  color: #93b8c8;
+}
+body.dark-theme .run-chip {
+  background: rgba(11, 21, 28, 0.88);
+  border-color: rgba(83, 124, 145, 0.18);
+  color: #bad7e3;
+}
+body.dark-theme .run-tool-title {
+  color: #d7edf4;
+}
+body.dark-theme .run-tool-phase,
+body.dark-theme .run-tool-label {
+  color: #93b8c8;
+}
+body.dark-theme .run-tool-value {
+  color: #c7e1eb;
+}
+body.dark-theme .run-tool-structured .run-tool-value {
+  background: rgba(11, 21, 28, 0.88);
+  border-color: rgba(83, 124, 145, 0.18);
+}
+body.dark-theme .run-panel {
+  background: rgba(18, 32, 44, 0.78);
+  border-color: rgba(83, 124, 145, 0.18);
+}
+body.dark-theme .run-panel-title {
+  color: #93b8c8;
+}
+body.dark-theme .run-panel-body {
+  color: #c7e1eb;
+}
+body.dark-theme .run-panel-item {
+  background: rgba(11, 21, 28, 0.88);
+}
+body.dark-theme .run-panel-item strong,
+body.dark-theme .run-artifact {
+  color: #9fd4e1;
 }
 body.dark-theme #msg::placeholder,
 body.dark-theme #welcome-msg::placeholder {
@@ -1991,6 +2206,80 @@ function addAssistantMessage(initialAnswer = "", initialThinking = "") {
   const stack = document.createElement("div");
   stack.className = "ai-stack";
 
+  const runBox = document.createElement("details");
+  runBox.className = "run-box hidden";
+  runBox.open = false;
+
+  const runSummary = document.createElement("summary");
+  runSummary.className = "run-summary";
+
+  const runSummaryMain = document.createElement("div");
+  runSummaryMain.className = "run-summary-main";
+
+  const runStatus = document.createElement("div");
+  runStatus.className = "run-status";
+  runStatus.textContent = "";
+
+  const runSummaryAside = document.createElement("div");
+  runSummaryAside.className = "run-summary-aside";
+  runSummaryAside.textContent = "";
+
+  const runMeta = document.createElement("div");
+  runMeta.className = "run-meta";
+
+  const runBody = document.createElement("div");
+  runBody.className = "run-body";
+
+  const runPanels = document.createElement("div");
+  runPanels.className = "run-panels";
+
+  const planPanel = document.createElement("div");
+  planPanel.className = "run-panel hidden";
+  const planPanelTitle = document.createElement("div");
+  planPanelTitle.className = "run-panel-title";
+  planPanelTitle.textContent = "Plan";
+  const planPanelBody = document.createElement("div");
+  planPanelBody.className = "run-panel-body compact-list";
+  planPanel.appendChild(planPanelTitle);
+  planPanel.appendChild(planPanelBody);
+
+  const currentStepPanel = document.createElement("div");
+  currentStepPanel.className = "run-panel hidden";
+  const currentStepPanelTitle = document.createElement("div");
+  currentStepPanelTitle.className = "run-panel-title";
+  currentStepPanelTitle.textContent = "Current Step";
+  const currentStepPanelBody = document.createElement("div");
+  currentStepPanelBody.className = "run-panel-body";
+  currentStepPanel.appendChild(currentStepPanelTitle);
+  currentStepPanel.appendChild(currentStepPanelBody);
+
+  const artifactsPanel = document.createElement("div");
+  artifactsPanel.className = "run-panel hidden";
+  const artifactsPanelTitle = document.createElement("div");
+  artifactsPanelTitle.className = "run-panel-title";
+  artifactsPanelTitle.textContent = "Artifacts";
+  const artifactsPanelBody = document.createElement("div");
+  artifactsPanelBody.className = "run-panel-body compact-list";
+  artifactsPanel.appendChild(artifactsPanelTitle);
+  artifactsPanel.appendChild(artifactsPanelBody);
+
+  runPanels.appendChild(planPanel);
+  runPanels.appendChild(currentStepPanel);
+  runPanels.appendChild(artifactsPanel);
+
+  const runTools = document.createElement("div");
+  runTools.className = "run-tools";
+
+  runSummaryMain.appendChild(runStatus);
+  runSummary.appendChild(runSummaryMain);
+  runSummary.appendChild(runSummaryAside);
+  runBody.appendChild(runMeta);
+  runBody.appendChild(runPanels);
+  runBody.appendChild(runTools);
+
+  runBox.appendChild(runSummary);
+  runBox.appendChild(runBody);
+
   const thinkBox = document.createElement("details");
   thinkBox.className = "think-box";
   thinkBox.open = false;
@@ -2010,15 +2299,153 @@ function addAssistantMessage(initialAnswer = "", initialThinking = "") {
 
   let answerText = initialAnswer || "";
   let thinkingText = initialThinking || "";
+  const toolLines = [];
+  let taskState = null;
+  let runPhase = "";
+
+  const renderToolEvent = (entry) => {
+    const line = document.createElement("div");
+    const phase = entry && entry.phase ? String(entry.phase) : "";
+    line.className = `run-tool ${phase ? `phase-${phase}` : ""}`.trim();
+
+    const head = document.createElement("div");
+    head.className = "run-tool-head";
+
+    const title = document.createElement("div");
+    title.className = "run-tool-title";
+    title.textContent = entry && entry.name ? `工具: ${entry.name}` : "工具事件";
+
+    const phaseEl = document.createElement("div");
+    phaseEl.className = "run-tool-phase";
+    phaseEl.textContent = phase === "start" ? "开始" : phase === "end" ? "完成" : phase || "运行中";
+
+    head.appendChild(title);
+    head.appendChild(phaseEl);
+    line.appendChild(head);
+
+    if (entry && entry.summary) {
+      const summary = document.createElement("div");
+      summary.className = "run-tool-summary";
+      summary.innerHTML = `<div class="run-tool-label">Summary</div><div class="run-tool-value"></div>`;
+      summary.querySelector(".run-tool-value").textContent = String(entry.summary);
+      line.appendChild(summary);
+    }
+
+    if (entry && entry.preview) {
+      const preview = document.createElement("div");
+      preview.className = "run-tool-preview";
+      preview.innerHTML = `<div class="run-tool-label">Preview</div><div class="run-tool-value"></div>`;
+      preview.querySelector(".run-tool-value").textContent = String(entry.preview);
+      line.appendChild(preview);
+    }
+
+    if (entry && entry.structured) {
+      const structured = document.createElement("div");
+      structured.className = "run-tool-structured";
+      structured.innerHTML = `<div class="run-tool-label">Structured</div><div class="run-tool-value"></div>`;
+      structured.querySelector(".run-tool-value").textContent = String(entry.structured);
+      line.appendChild(structured);
+    }
+
+    return line;
+  };
 
   const render = () => {
     const normalizedAnswer = (answerText || "").replace(/\n{3,}/g, "\n\n");
     bubble.innerHTML = marked.parse(normalizedAnswer);
     thinkContent.textContent = thinkingText;
     thinkBox.classList.toggle("hidden", !thinkingText.trim());
+    runMeta.innerHTML = "";
+    if (taskState && typeof taskState === "object") {
+      const chips = [];
+      if (taskState.stage) chips.push(`阶段: ${taskState.stage}`);
+      if (taskState.current_step && taskState.max_steps) {
+        chips.push(`步骤: ${taskState.current_step}/${taskState.max_steps}`);
+      }
+      if (taskState.current_tool) chips.push(`工具: ${taskState.current_tool}`);
+      if (taskState.tool_count) chips.push(`证据: ${taskState.tool_count}`);
+      chips.forEach((text) => {
+        const chip = document.createElement("div");
+        chip.className = "run-chip";
+        chip.textContent = text;
+        runMeta.appendChild(chip);
+      });
+    }
+    planPanelBody.innerHTML = "";
+    currentStepPanelBody.innerHTML = "";
+    artifactsPanelBody.innerHTML = "";
+    planPanel.classList.add("hidden");
+    currentStepPanel.classList.add("hidden");
+    artifactsPanel.classList.add("hidden");
+
+    const planSummary = taskState && typeof taskState === "object" ? taskState.plan_summary : null;
+    if (planSummary && typeof planSummary === "object") {
+      const planItems = [
+        `目标: ${planSummary.goal || ""}`,
+        `进度: ${planSummary.completed_steps || 0}/${planSummary.total_steps || 0}`,
+      ];
+      planItems.forEach((text) => {
+        const item = document.createElement("div");
+        item.className = "run-panel-item";
+        item.textContent = text;
+        planPanelBody.appendChild(item);
+      });
+      planPanel.classList.remove("hidden");
+    }
+
+    const currentPlanStep = taskState && typeof taskState === "object" ? taskState.current_plan_step : null;
+    if (currentPlanStep && typeof currentPlanStep === "object") {
+      const parts = [];
+      if (currentPlanStep.phase) parts.push(`<strong>阶段</strong>: ${currentPlanStep.phase}`);
+      if (currentPlanStep.description) parts.push(`<strong>说明</strong>: ${currentPlanStep.description}`);
+      if (currentPlanStep.expected_action) parts.push(`<strong>动作</strong>: ${currentPlanStep.expected_action}`);
+      if (currentPlanStep.skill) parts.push(`<strong>Skill</strong>: ${currentPlanStep.skill}`);
+      if (currentPlanStep.completion_criteria) parts.push(`<strong>完成条件</strong>: ${currentPlanStep.completion_criteria}`);
+      currentStepPanelBody.innerHTML = parts.join("<br>");
+      currentStepPanel.classList.remove("hidden");
+    }
+
+    const artifacts = taskState && typeof taskState === "object" && Array.isArray(taskState.artifacts)
+      ? taskState.artifacts
+      : [];
+    if (artifacts.length) {
+      artifacts.slice(0, 8).forEach((path) => {
+        const item = document.createElement("div");
+        item.className = "run-panel-item";
+        const link = document.createElement("a");
+        link.className = "run-artifact";
+        link.href = "#";
+        link.textContent = String(path);
+        link.title = String(path);
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+        });
+        item.appendChild(link);
+        artifactsPanelBody.appendChild(item);
+      });
+      artifactsPanel.classList.remove("hidden");
+    }
+
+    const toolCount = toolLines.length;
+    const summaryBits = [];
+    if (toolCount > 0) {
+      summaryBits.push(`${toolCount} 步`);
+    }
+    if (runPhase === "end") {
+      summaryBits.push("已折叠");
+      runBox.open = false;
+    } else if (runPhase === "error") {
+      summaryBits.push("可展开查看");
+      runBox.open = true;
+    } else if ((runPhase === "start" || runPhase === "accepted") && toolCount > 0) {
+      summaryBits.push("运行中");
+    }
+    runSummaryAside.textContent = summaryBits.join(" · ");
+    runBox.classList.toggle("hidden", !runStatus.textContent.trim() && toolLines.length === 0);
     scrollBottom();
   };
 
+  stack.appendChild(runBox);
   stack.appendChild(thinkBox);
   stack.appendChild(bubble);
   wrap.appendChild(stack);
@@ -2041,6 +2468,24 @@ function addAssistantMessage(initialAnswer = "", initialThinking = "") {
     },
     appendThinking(chunk) {
       thinkingText += chunk || "";
+      render();
+    },
+    setStatus(text) {
+      runStatus.textContent = text || "";
+      render();
+    },
+    setPhase(phase) {
+      runPhase = phase || "";
+      render();
+    },
+    setTaskState(nextTaskState) {
+      taskState = nextTaskState && typeof nextTaskState === "object" ? nextTaskState : null;
+      render();
+    },
+    pushToolEvent(entry) {
+      if (!entry) return;
+      toolLines.push(entry);
+      runTools.appendChild(renderToolEvent(entry));
       render();
     },
   };
@@ -2323,7 +2768,47 @@ async function sendMessage(msg, source) {
         if (event === "thinking") {
           aiMessage.appendThinking(text);
         } else if (event === "answer") {
+          if (!text) return;
           aiMessage.appendAnswer(text);
+        } else if (event === "lifecycle") {
+          const phase = typeof payload.phase === "string" ? payload.phase : "";
+          const taskState = payload && typeof payload.taskState === "object" ? payload.taskState : null;
+          const labels = {
+            accepted: "任务已接收",
+            start: "正在分析并执行",
+            end: "执行完成",
+            error: "执行失败",
+          };
+          aiMessage.setStatus(labels[phase] || phase || "运行中");
+          aiMessage.setPhase(phase);
+          if (taskState) {
+            aiMessage.setTaskState(taskState);
+          }
+        } else if (event === "tool") {
+          const phase = typeof payload.phase === "string" ? payload.phase : "";
+          const name = typeof payload.name === "string" ? payload.name : "tool";
+          const preview = typeof payload.resultPreview === "string" ? payload.resultPreview : "";
+          const summary = typeof payload.summary === "string" ? payload.summary : "";
+          const structured = typeof payload.structuredPreview === "string" ? payload.structuredPreview : "";
+          const taskState = payload && typeof payload.taskState === "object" ? payload.taskState : null;
+          if (taskState) {
+            aiMessage.setTaskState(taskState);
+          }
+          if (phase === "start") {
+            aiMessage.pushToolEvent({
+              phase,
+              name,
+              summary,
+            });
+          } else if (phase === "end") {
+            aiMessage.pushToolEvent({
+              phase,
+              name,
+              summary,
+              preview,
+              structured,
+            });
+          }
         } else if (event === "error") {
           aiMessage.setAnswer(text || "网络错误");
         } else if (event === "done") {

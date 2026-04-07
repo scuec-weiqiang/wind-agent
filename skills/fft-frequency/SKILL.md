@@ -4,6 +4,7 @@ name: fft 风机塔台振动分析
 description: 基于 skill 内置的 scripts/fft.py 对风机塔台振动 csv 数据做主频识别、偏离趋势与预警分析。
 command: ["{python}", "scripts/run.py", "--input", "{input}", "--session-id", "{session_id}"]
 aliases: ["fft", "tower-fft", "vibration-fft", "风机频率分析", "振动频率分析"]
+metadata: {"structured-result": true, "workflow-hint": "analysis"}
 ---
 
 # FFT 风机塔台振动分析
